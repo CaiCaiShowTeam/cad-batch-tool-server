@@ -4,8 +4,9 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/cad-batch-tool-bean"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/cad-tool-core"/>
-	<classpathentry kind="lib" path="/cad-tool-core/lib/wnc-wt-11.0.3.0.jar" sourcepath="/cad-tool-core/lib/wnc-wt-11.0.3.0.jar"/>
-	<classpathentry kind="lib" path="/cad-tool-core/lib/commons-io-2.6.jar"/>
-	<classpathentry kind="lib" path="/cad-tool-core/lib/log4j-1.2.17.jar"/>
+	<classpathentry kind="lib" path="lib/commons-io-2.6.jar"/>
+	<classpathentry kind="lib" path="lib/log4j-1.2.17.jar"/>
+	<classpathentry kind="lib" path="lib/wnc-com-11.0.3.0.jar"/>
+	<classpathentry kind="lib" path="lib/wnc-wt-11.0.3.0.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
