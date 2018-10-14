@@ -1,0 +1,45 @@
+﻿ResourceInfo.class=wt.tools.resource.StringResourceInfo
+ResourceInfo.customizable=true
+ResourceInfo.deprecated=false
+
+# Entry Format (values equal to default value are not included)
+# <key>.value=
+# <key>.category=
+# <key>.comment=
+# <key>.argComment<n>=
+# <key>.constant=
+# <key>.customizable=
+# <key>.deprecated=
+# <key>.abbreviatedDisplay=
+# <key>.fullDisplay=
+# <key>.shortDescription=
+# <key>.longDescription=
+# <key>.order=
+# <key>.defaultValue=
+# <key>.selectable=
+
+# Entry Contents
+
+MISS_CONFIGURATION.value=未找到{0}配置，请联系系统管理员！
+MISS_CONFIGURATION.constant=MISS_CONFIGURATION
+MISS_CONFIGURATION.comment=Miss configuration
+
+MISS_JDENUM.value=JDE编号为空，请填写[JDE编号]！
+MISS_JDENUM.constant=MISS_JDENUM
+MISS_JDENUM.comment=JDE is required
+
+MISS_WTPART_NUMBER.value=无法执行部件查询，缺失部件编号，请联系系统管理员！
+MISS_WTPART_NUMBER.constant=MISS_WTPART_NUMBER
+MISS_WTPART_NUMBER.comment=WTPart number is required
+
+WTPART_NOT_EXIST.value=编号为[{0}]的部件在系统中不存在，请确认后提交！
+WTPART_NOT_EXIST.constant=WTPART_NOT_EXIST
+WTPART_NOT_EXIST.comment=WTPart is required
+
+INSTANCE_NUMBER_ERROR.value=实例化编码错误，请联系系统管理员！
+INSTANCE_NUMBER_ERROR.constant=INSTANCE_NUMBER_ERROR
+INSTANCE_NUMBER_ERROR.comment=Error to instance numbers
+
+ACCESS_DENIED.value=您尚未获取对[{0}]对象的{1}权限，请联系系统管理员！
+ACCESS_DENIED.constant=ACCESS_DENIED
+ACCESS_DENIED.comment=Error to instance numbers

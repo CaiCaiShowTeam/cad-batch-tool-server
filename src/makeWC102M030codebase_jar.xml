@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<project name="makeWC102M030codebase" default="default" basedir=".">
+	<description>Builds, tests, and runs this project.</description>
+	<property environment="env" />
+	<property name="wthome" location="${env.WT_HOME}" />
+	<property name="defaultComDir" location="${wthome}/codebase" description="Path to target Windchill com (used if not **/Windchill/codebase/com)" />
+	<property name="defaultWtDir" location="${wthome}/codebase" description="Path to target Windchill wt (used if not **/Windchill/codebase/wt)" />
+	<property name="comJarDirectory" location="${wthome}/custom" />
+	<property name="wtJarDirectory" location="${wthome}/custom" />
+	<target name="default" depends="makeWC102M030com, makeWC102M030wt, makeWC102M030client" />
+	<target name="init" />
+	<target name="makeWC102M030com" depends="init">
+		<jar destfile="${comJarDirectory}/wnc-com-10.2.0.3.0.jar" basedir="${defaultComDir}" excludes="**/ext/*" includes="com/**/*.class" />
+	</target>
+	<target name="makeWC102M030wt" depends="init">
+		<jar destfile="${wtJarDirectory}/wnc-wt-10.2.0.3.0.jar" basedir="${defaultWtDir}" excludes="**/ext/*" includes="wt/**/*.class" />
+	</target>
+	<target name="makeWC102M030client" depends="init">
+		<jar destfile="${wtJarDirectory}/wnc-client-10.2.0.3.0.jar" basedir="${defaultWtDir}" excludes="**/ext/*" 
+			 includes="wt/util/**/*.class,
+					   wt/session/**/*.class,
+					   wt/servlet/**/*.class,
+					   wt/rmi/**/*.class,
+					   wt/method/**/*.class,
+					   wt/manager/**/*.class,
+					   wt/log4j/**/*.class,
+					   wt/httpgw/**/*.class,
+					   wt/feedback/**/*.class,
+					   wt/boot/**/*.class,
+					   wt/auth/**/*.class,
+					   com/ptc/net/auth/*.class,
+					   com/ptc/http/cookies/*.class"
+			/>
+	</target>
+</project>
