@@ -13,6 +13,8 @@ import com.bplead.cad.bean.DataContent;
 import com.bplead.cad.bean.SimpleDocument;
 import com.bplead.cad.bean.SimpleFolder;
 import com.bplead.cad.bean.SimplePdmLinkProduct;
+import com.bplead.cad.bean.io.CadDocument;
+import com.bplead.cad.bean.io.CadDocuments;
 import com.bplead.cad.bean.io.Document;
 import com.bplead.cad.bean.io.Documents;
 import com.ptc.windchill.uwgm.common.util.PrintHelper;
@@ -46,6 +48,34 @@ public class ServerUtils implements RemoteAccess, Serializable {
     private static final String NAVIGATION_RB = "com.ptc.core.ui.navigationRB";
     private static final long serialVersionUID = 3944141455864195993L;
     private static final String WELCOME = "WELCOME";
+    
+    public static HandleResult<Documents> initialize (CadDocuments cadDocumets) {
+   	HandleResult<Documents> result = null;
+   	try {
+   	    Assert.notNull (cadDocumets,"Error to get documents");
+   	    Assert.notNull (cadDocumets.getCadDocs (),"Error to getDocuments of documents");
+
+   	    List<CadDocument> cadDocumentL = cadDocumets.getCadDocs ();
+   	    if (logger.isInfoEnabled ()) {
+   		logger.info ("initialize data is -> " + ( cadDocumentL == null ? "cadDocumentL is null " : cadDocumentL.size () ));
+   	    }
+   	    List<Document> documentL = new ArrayList<Document> ();
+   	    for (int i = 0; i < cadDocumentL.size (); i++) {
+   		CadDocument cadDocument = cadDocumentL.get (i);
+   		if (logger.isDebugEnabled ()) {
+   		    logger.debug ("current processor order is ->  " + ( i + 1 ) + " cadDocument is -> " + cadDocument);
+   		}
+   	    }
+   	    Documents documents = new Documents ();
+   	    documents.setDocuments (documentL);
+   	    result = HandleResult.toSuccessedResult (documents);
+   	}
+   	catch(Exception e) {
+   	    result = HandleResult.toErrorResult (e);
+   	    e.printStackTrace ();
+   	}
+   	return result;
+       }
 
     public static HandleResult<Boolean> checkin(Documents documents) {
 	HandleResult<Boolean> result = null;
@@ -80,6 +110,94 @@ public class ServerUtils implements RemoteAccess, Serializable {
 
 	    }
 	    result = HandleResult.toSuccessedResult (true);
+
+	    tran.commit ();
+	    tran = null;
+	}
+	catch(Exception e) {
+	    result = HandleResult.toErrorResult (e);
+	    e.printStackTrace ();
+	}
+	finally {
+	    if (tran != null) {
+		tran.rollback ();
+	    }
+
+	    if (result == null) {
+		result = HandleResult.toUnExpectedResult ();
+	    }
+	}
+	return result;
+    }
+    
+    public static HandleResult<List<SimpleDocument>> undoCheckout(Documents documents) {
+	HandleResult<List<SimpleDocument>> result = null;
+	Transaction tran = null;
+	try {
+	    tran = new Transaction ();
+	    tran.start ();
+
+	    Assert.notNull (documents,"Error to get documents");
+	    Assert.notNull (documents.getDocuments (),"Error to getDocuments of documents");
+
+	    List<Document> docList = documents.getDocuments ();
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("undo check in dwg count is -> " + ( docList == null ? "docList is null " : docList.size () ));
+	    }
+	    List<SimpleDocument> returnList = new ArrayList<SimpleDocument> ();
+	    for (int i = 0; i < docList.size (); i++) {
+		Document document = docList.get (i);
+		if (logger.isDebugEnabled ()) {
+		    logger.debug ("current processor order is ->  " + ( i + 1 ));
+		}
+		Assert.notNull (document,"Error to get document");
+		returnList.add (CADHelper.undoCheckout (document));
+	    }
+	    result = HandleResult.toSuccessedResult (returnList);
+
+	    tran.commit ();
+	    tran = null;
+	}
+	catch(Exception e) {
+	    result = HandleResult.toErrorResult (e);
+	    e.printStackTrace ();
+	}
+	finally {
+	    if (tran != null) {
+		tran.rollback ();
+	    }
+
+	    if (result == null) {
+		result = HandleResult.toUnExpectedResult ();
+	    }
+	}
+	return result;
+    }
+    
+    public static HandleResult<List<SimpleDocument>> checkout(Documents documents) {
+	HandleResult<List<SimpleDocument>> result = null;
+	Transaction tran = null;
+	try {
+	    tran = new Transaction ();
+	    tran.start ();
+
+	    Assert.notNull (documents,"Error to get documents");
+	    Assert.notNull (documents.getDocuments (),"Error to getDocuments of documents");
+
+	    List<Document> docList = documents.getDocuments ();
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("undo check in dwg count is -> " + ( docList == null ? "docList is null " : docList.size () ));
+	    }
+	    List<SimpleDocument> returnList = new ArrayList<SimpleDocument> ();
+	    for (int i = 0; i < docList.size (); i++) {
+		Document document = docList.get (i);
+		if (logger.isDebugEnabled ()) {
+		    logger.debug ("current processor order is ->  " + ( i + 1 ));
+		}
+		Assert.notNull (document,"Error to get document");
+		returnList.add (CADHelper.checkout (document));
+	    }
+	    result = HandleResult.toSuccessedResult (returnList);
 
 	    tran.commit ();
 	    tran = null;

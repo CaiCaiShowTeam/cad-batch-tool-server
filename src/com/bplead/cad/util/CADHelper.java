@@ -15,9 +15,13 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
 import com.bplead.cad.annotation.IbaField;
+import com.bplead.cad.bean.SimpleDocument;
+import com.bplead.cad.bean.SimpleFolder;
+import com.bplead.cad.bean.SimplePdmLinkProduct;
 import com.bplead.cad.bean.io.Attachment;
 import com.bplead.cad.bean.io.AttachmentModel;
 import com.bplead.cad.bean.io.CadDocument;
+import com.bplead.cad.bean.io.Container;
 import com.bplead.cad.bean.io.Document;
 import com.bplead.cad.config.ConfigAnalyticalTool;
 import com.ptc.windchill.uwgm.common.util.PrintHelper;
@@ -46,18 +50,24 @@ import wt.folder.CabinetBased;
 import wt.folder.Folder;
 import wt.folder.FolderEntry;
 import wt.folder.FolderHelper;
+import wt.folder.Foldered;
 import wt.iba.value.IBAHolder;
 import wt.iba.value.service.IBAValueHelper;
+import wt.inf.container.WTContained;
 import wt.inf.container.WTContainer;
 import wt.log4j.LogR;
 import wt.method.RemoteAccess;
 import wt.part.WTPart;
+import wt.query.QuerySpec;
+import wt.query.SearchCondition;
 import wt.util.WTException;
 import wt.util.WTPropertyVetoException;
 import wt.vc.IterationIdentifier;
 import wt.vc.VersionControlHelper;
 import wt.vc.VersionIdentifier;
 import wt.vc.Versioned;
+import wt.vc.config.ConfigSpec;
+import wt.vc.config.LatestConfigSpec;
 import wt.vc.views.View;
 import wt.vc.views.ViewHelper;
 import wt.vc.wip.CheckoutLink;
@@ -73,6 +83,144 @@ public class CADHelper implements RemoteAccess {
     
     public static EPMDocumentType componentType = EPMDocumentType.toEPMDocumentType("CADCOMPONENT");
     public static EPMAuthoringAppType authorAutoCAD = EPMAuthoringAppType.toEPMAuthoringAppType("ACAD");
+    
+    public static Document initialize(CadDocument cadDocument) throws Exception {
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("initialize param is -> " + cadDocument);
+	}
+	Document document = new Document ();
+	document.setObject (cadDocument);
+	// TODO
+	String number = cadDocument.getNumber ();
+	number = setExtension (number,"DWG");
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("find epmdocument by number is -> " + number);
+	}
+	EPMDocument epmDoc = getDocumentByNumber (number);
+	if (epmDoc == null) {// not exist in plm
+	    document.setEditEnable (true);
+	} else {//exist in plm
+	    document.setEditEnable (false);
+	    document.setName (epmDoc.getName ());
+	    document.setNumber (epmDoc.getNumber ());
+	    document.setOid (CommonUtils.getPersistableOid (epmDoc));
+	    Container container = new Container (buildSimpleProduct (epmDoc),buildSimpleFolder (epmDoc));
+	    document.setContainer (container);
+	}
+	
+	return document;
+    }
+    
+    public static SimplePdmLinkProduct buildSimpleProduct (WTContained wtcontained) {
+	SimplePdmLinkProduct product = new SimplePdmLinkProduct ();
+	product.setOid (CommonUtils.getPersistableOid (wtcontained.getContainer ()));
+	product.setName (wtcontained.getContainerName ());
+	product.setSelected (true);
+	return product;
+    }
+    
+    public static SimpleFolder buildSimpleFolder (Foldered foldered) throws WTException {
+	SimpleFolder folder = new SimpleFolder ();
+	folder.setOid (CommonUtils.getPersistableOid (getParentFolder (foldered)));
+	folder.setName (getFolderPath (foldered));
+	folder.setSelected (true);
+	return folder;
+    }
+    
+    public static String getFolderPath (Foldered foldered) throws WTException {
+	Folder folder = getParentFolder (foldered);
+	String folderPath = FolderHelper.getFolderPath (folder);
+	if (folderPath != null) {
+	    folderPath = folderPath.replaceFirst ("\\A/?Default", "/" + folder.getContainerName ());
+	}
+	return folderPath;
+    }
+    
+    public static Folder getParentFolder (Foldered foldered) {
+	Folder folder = null;
+	if (foldered.getParentFolder () != null && foldered.getParentFolder ().getObject () != null) {
+	    folder = (Folder) foldered.getParentFolder ().getObject ();
+	} else if (foldered.getCabinet () != null) {
+	    folder = (Folder) foldered.getCabinet ().getObject ();
+	}
+	return folder;
+    }
+    
+    public static EPMDocument getDocumentByNumber(String number) throws WTException  {
+        return getDocumentByNumber(number, null);
+    }
+
+    @SuppressWarnings("deprecation")
+    public static EPMDocument getDocumentByNumber(String number, ConfigSpec configSpec) throws WTException  {
+        if (configSpec == null) {
+            configSpec = new LatestConfigSpec();
+        }
+
+        QuerySpec querySpec = new QuerySpec(EPMDocument.class);
+        int[] fromIndicies = { 0, -1 };
+        querySpec.appendWhere(new SearchCondition(EPMDocument.class,
+                                    EPMDocument.NUMBER,
+                                    SearchCondition.EQUAL,
+                                    number),
+                              fromIndicies);
+        querySpec = configSpec.appendSearchCriteria(querySpec);
+
+        QueryResult qr = PersistenceHelper.manager.find(querySpec);
+        qr = configSpec.process(qr);
+
+        return (EPMDocument) (qr.hasMoreElements() ? qr.nextElement() : null);
+    }
+    
+    public static EPMDocument getDocumentByName(String name) throws WTException  {
+        return getDocumentByName(name, null);
+    }
+
+    @SuppressWarnings("deprecation")
+    public static EPMDocument getDocumentByName(String name, ConfigSpec configSpec) throws WTException  {
+        if (configSpec == null) {
+            configSpec = new LatestConfigSpec();
+        }
+
+        QuerySpec querySpec = new QuerySpec(EPMDocument.class);
+        int[] fromIndicies = { 0, -1 };
+        querySpec.appendWhere(new SearchCondition(EPMDocument.class,
+                                    EPMDocument.NAME,
+                                    SearchCondition.EQUAL,
+                                    name),
+                              fromIndicies);
+        querySpec = configSpec.appendSearchCriteria(querySpec);
+
+        QueryResult qr = PersistenceHelper.manager.find(querySpec);
+        qr = configSpec.process(qr);
+
+        return (EPMDocument) (qr.hasMoreElements() ? qr.nextElement() : null);
+    }
+
+
+    public static EPMDocument getDocumentByCadName(String name) throws WTException  {
+        return getDocumentByCadName(name, null);
+    }
+
+    @SuppressWarnings("deprecation")
+    public static EPMDocument getDocumentByCadName(String name, ConfigSpec configSpec) throws WTException  {
+        if (configSpec == null) {
+            configSpec = new LatestConfigSpec();
+        }
+
+        QuerySpec querySpec = new QuerySpec(EPMDocument.class);
+        int[] fromIndicies = { 0, -1 };
+        querySpec.appendWhere(new SearchCondition(EPMDocument.class,
+                                    EPMDocument.CADNAME,
+                                    SearchCondition.EQUAL,
+                                    name),
+                              fromIndicies);
+        querySpec = configSpec.appendSearchCriteria(querySpec);
+
+        QueryResult qr = PersistenceHelper.manager.find(querySpec);
+        qr = configSpec.process(qr);
+
+        return (EPMDocument) (qr.hasMoreElements() ? qr.nextElement() : null);
+    }
     
     /**
      * Create a new EPMDocument, Specify CADName , defaultUnit and log the
@@ -93,7 +241,7 @@ public class CADHelper implements RemoteAccess {
 	}
 	Assert.isNull (cadDoc,"cadDoc is null");
 
-	WTContainer wtcontainer = CommonUtils.getPersistable (document.getContainer ().getContainer ().getOid (),
+	WTContainer wtcontainer = CommonUtils.getPersistable (document.getContainer ().getProduct ().getOid (),
 		WTContainer.class);
 	Assert.isNull (wtcontainer,"wtcontainer is null");
 
@@ -280,7 +428,7 @@ public class CADHelper implements RemoteAccess {
 	}
 	Assert.isNull (cadDoc,"cadDoc is null");
 
-	WTContainer wtcontainer = CommonUtils.getPersistable (document.getContainer ().getContainer ().getOid (),
+	WTContainer wtcontainer = CommonUtils.getPersistable (document.getContainer ().getProduct ().getOid (),
 		WTContainer.class);
 	Assert.isNull (wtcontainer,"wtcontainer is null");
 
@@ -346,6 +494,19 @@ public class CADHelper implements RemoteAccess {
 	    throw new WTException (e);
 	}
 	return holder;
+    }
+    
+    public static SimpleDocument checkout(Document document) throws WTException, WTPropertyVetoException {
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("checkout of " + document);
+	}
+	EPMDocument epm = CommonUtils.getPersistable (document.getOid (),EPMDocument.class);
+
+	EPMDocument originalEpm = (EPMDocument) checkout (epm,"cad tool checkout");
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("checkout success !");
+	}
+	return new SimpleDocument (CommonUtils.getPersistableOid (originalEpm),originalEpm.getName (),originalEpm.getNumber ());
     }
 
     public static Workable checkout(Workable object, String note) throws WTException, WTPropertyVetoException {
@@ -416,6 +577,19 @@ public class CADHelper implements RemoteAccess {
 	return checkOutLinks;
     }
     
+    public static SimpleDocument undoCheckout(Document document) throws WTException, WTPropertyVetoException {
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("Undo Checkout of " + document);
+	}
+	EPMDocument epm = CommonUtils.getPersistable (document.getOid (),EPMDocument.class);
+
+	EPMDocument originalEpm = (EPMDocument) undoCheckout (epm);
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("Undo Checkout success !");
+	}
+	return new SimpleDocument (CommonUtils.getPersistableOid (originalEpm),originalEpm.getName (),originalEpm.getNumber ());
+    }
+
     public static Workable undoCheckout(Workable object) throws WTException, WTPropertyVetoException {
 	if (logger.isInfoEnabled ()) {
 	    logger.info ("Undo Checkout of " + PrintHelper.printIterated (object));
