@@ -21,6 +21,7 @@ import com.bplead.cad.bean.SimplePdmLinkProduct;
 import com.bplead.cad.bean.io.Attachment;
 import com.bplead.cad.bean.io.AttachmentModel;
 import com.bplead.cad.bean.io.CadDocument;
+import com.bplead.cad.bean.io.CadStatus;
 import com.bplead.cad.bean.io.Container;
 import com.bplead.cad.bean.io.Document;
 import com.bplead.cad.config.ConfigAnalyticalTool;
@@ -98,9 +99,9 @@ public class CADHelper implements RemoteAccess {
 	}
 	EPMDocument epmDoc = getDocumentByNumber (number);
 	if (epmDoc == null) {// not exist in plm
-	    document.setEditEnable (true);
+	    document.setCadStatus (CadStatus.NOT_EXIST);
 	} else {//exist in plm
-	    document.setEditEnable (false);
+	    document.setCadStatus (WorkInProgressHelper.isCheckedOut (epmDoc) ? CadStatus.CHECK_OUT : CadStatus.CHECK_IN);
 	    document.setName (epmDoc.getName ());
 	    document.setNumber (epmDoc.getNumber ());
 	    document.setOid (CommonUtils.getPersistableOid (epmDoc));
