@@ -11,7 +11,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
 import com.bplead.cad.annotation.IbaField;
@@ -28,6 +27,7 @@ import com.bplead.cad.config.ConfigAnalyticalTool;
 import com.ptc.windchill.uwgm.common.util.PrintHelper;
 
 import priv.lee.cad.util.Assert;
+import priv.lee.cad.util.StringUtils;
 import wt.content.ApplicationData;
 import wt.content.ContentHelper;
 import wt.content.ContentHolder;
@@ -338,7 +338,7 @@ public class CADHelper implements RemoteAccess {
 //		.toLocalizedMessage(CustomPrompt.ACCESS_DENIED, document.getNumber(), AccessPermission.CREATE));
 	//oid exist
 	EPMDocument epm = null;
-	if (StringUtils.isNotBlank(document.getOid())) {
+	if (StringUtils.hasText (document.getOid())) {
 	    epm = updateEPMDocument(document);
 	} else {
 	    epm = createEPMDocument(document);
@@ -717,7 +717,7 @@ public class CADHelper implements RemoteAccess {
 		}
 		IbaField ibaField = field.getAnnotation (IbaField.class);
 		//target() contains ibaTarget
-		if (StringUtils.contains (ibaField.target (),ibaTarget)) {
+		if (ibaField.target ().contains (ibaTarget)) {
 		    ibaTool.setIBAValue (ibaField.ibaName (),object.toString ());
 		    if (logger.isDebugEnabled ()) {
 			logger.debug ("setIBAValues iba name is -> " + ibaField.ibaName () + " iba value is -> " + object);
@@ -994,6 +994,7 @@ public class CADHelper implements RemoteAccess {
 	    return EPMDocumentType.getEPMDocumentTypeDefault ();
 	}
     }
- 
+    
+    
     
 }
