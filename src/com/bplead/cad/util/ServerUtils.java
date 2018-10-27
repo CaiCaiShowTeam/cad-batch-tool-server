@@ -15,12 +15,15 @@ import com.bplead.cad.bean.SimpleFolder;
 import com.bplead.cad.bean.SimplePdmLinkProduct;
 import com.bplead.cad.bean.io.CadDocument;
 import com.bplead.cad.bean.io.CadDocuments;
+import com.bplead.cad.bean.io.CadStatus;
+import com.bplead.cad.bean.io.Container;
 import com.bplead.cad.bean.io.Document;
 import com.bplead.cad.bean.io.Documents;
 import com.ptc.windchill.uwgm.common.util.PrintHelper;
 
 import priv.lee.cad.bean.HandleResult;
 import priv.lee.cad.util.Assert;
+import wt.epm.EPMDocument;
 import wt.fc.QueryResult;
 import wt.fc.WTObject;
 import wt.folder.Folder;
@@ -29,6 +32,7 @@ import wt.folder.SubFolder;
 import wt.inf.container.ContainerSpec;
 import wt.inf.container.WTContainerHelper;
 import wt.inf.container.WTContainerRef;
+import wt.log4j.LogR;
 import wt.method.RemoteAccess;
 import wt.org.WTPrincipal;
 import wt.org.WTPrincipalReference;
@@ -38,44 +42,81 @@ import wt.pom.Transaction;
 import wt.session.SessionHelper;
 import wt.util.WTException;
 import wt.util.WTPropertyVetoException;
+import wt.vc.wip.WorkInProgressHelper;
 
 public class ServerUtils implements RemoteAccess, Serializable {
 
     private static final String DEFAULT_FOLDER = "/Default";
     public static final String EXCEPTION_RB = "com.bplead.cad.resource.CADToolExceptionRB_zh_CN";
     private static final Locale locale = Locale.CHINESE;
-    private static final Logger logger = Logger.getLogger (ServerUtils.class);
+    private static Logger logger = LogR.getLogger (ServerUtils.class.getName ());
     private static final String NAVIGATION_RB = "com.ptc.core.ui.navigationRB";
     private static final long serialVersionUID = 3944141455864195993L;
     private static final String WELCOME = "WELCOME";
-    
-    public static HandleResult<Documents> initialize (CadDocuments cadDocumets) {
-   	HandleResult<Documents> result = null;
-   	try {
-   	    Assert.notNull (cadDocumets,"Error to get documents");
-   	    Assert.notNull (cadDocumets.getCadDocs (),"Error to getDocuments of documents");
 
-   	    List<CadDocument> cadDocumentL = cadDocumets.getCadDocs ();
-   	    if (logger.isInfoEnabled ()) {
-   		logger.info ("initialize data is -> " + ( cadDocumentL == null ? "cadDocumentL is null " : cadDocumentL.size () ));
-   	    }
-   	    List<Document> documentL = new ArrayList<Document> ();
-   	    for (int i = 0; i < cadDocumentL.size (); i++) {
-   		CadDocument cadDocument = cadDocumentL.get (i);
-   		if (logger.isDebugEnabled ()) {
-   		    logger.debug ("current processor order is ->  " + ( i + 1 ) + " cadDocument is -> " + cadDocument);
-   		}
-   	    }
-   	    Documents documents = new Documents ();
-   	    documents.setDocuments (documentL);
-   	    result = HandleResult.toSuccessedResult (documents);
-   	}
-   	catch(Exception e) {
-   	    result = HandleResult.toErrorResult (e);
-   	    e.printStackTrace ();
-   	}
-   	return result;
-       }
+    public static HandleResult<Documents> initialize(CadDocuments cadDocumets) {
+	HandleResult<Documents> result = null;
+	try {
+	    Assert.notNull (cadDocumets,"Error to get documents");
+	    Assert.notNull (cadDocumets.getCadDocs (),"Error to getDocuments of documents");
+
+	    List<CadDocument> cadDocumentL = cadDocumets.getCadDocs ();
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("initialize data is -> "
+			+ ( cadDocumentL == null ? "cadDocumentL is null " : cadDocumentL.size () ));
+	    }
+	    List<Document> documentL = new ArrayList<Document> ();
+	    for (int i = 0; i < cadDocumentL.size (); i++) {
+		CadDocument cadDocument = cadDocumentL.get (i);
+		if (logger.isDebugEnabled ()) {
+		    logger.debug ("current processor order is ->  " + ( i + 1 ) + " cadDocument is -> " + cadDocument);
+		}
+		Document document = new Document ();
+		document.setObject (cadDocument);
+		String number = cadDocument.getNumber ();
+		EPMDocument epm = CADHelper.getDocumentByNumber (number);
+		if (epm == null) {
+		    if (logger.isDebugEnabled ()) {
+			logger.debug ("图纸编号[" + number + "]的对象在系统中不存在.");
+		    }
+		    document.setCadStatus (CadStatus.NOT_EXIST);
+		} else {
+		    if (logger.isDebugEnabled ()) {
+			logger.debug ("epm display is -> " + PrintHelper.printIterated (epm));
+		    }
+		    buildDocumentByEPMDocument (document,epm);
+		}
+		documentL.add (document);
+	    }
+	    Documents documents = new Documents ();
+	    documents.setDocuments (documentL);
+	    result = HandleResult.toSuccessedResult (documents);
+	}
+	catch(Exception e) {
+	    result = HandleResult.toErrorResult (e);
+	    e.printStackTrace ();
+	}
+	return result;
+    }
+
+    public static void buildDocumentByEPMDocument(Document document, EPMDocument epm) throws WTException {
+	document.setNumber (epm.getNumber ());
+	document.setName (epm.getName ());
+	document.setOid (CommonUtils.getPersistableOid (epm));
+	Container container = new Container ();
+	SimplePdmLinkProduct product = new SimplePdmLinkProduct (CommonUtils.getPersistableOid (epm.getContainer ()),
+		epm.getContainerName ());
+	SimpleFolder folder = new SimpleFolder (CommonUtils.getPersistableOid (CADHelper.getParentFolder (epm)),
+		CADHelper.getFolderPath (epm));
+	container.setProduct (product);
+	container.setFolder (folder);
+	document.setContainer (container);
+	if (WorkInProgressHelper.isCheckedOut (epm)) {
+	    document.setCadStatus (CadStatus.CHECK_OUT);
+	} else {
+	    document.setCadStatus (CadStatus.CHECK_IN);
+	}
+    }
 
     public static HandleResult<Boolean> checkin(Documents documents) {
 	HandleResult<Boolean> result = null;
@@ -87,16 +128,20 @@ public class ServerUtils implements RemoteAccess, Serializable {
 	    Assert.notNull (documents,"Error to get documents");
 	    Assert.notNull (documents.getDocuments (),"Error to getDocuments of documents");
 
-	    List<Document> docList = documents.getDocuments ();
-	    if (logger.isInfoEnabled ()) {
-		logger.info ("check in dwg count is -> " + ( docList == null ? "docList is null " : docList.size () ));
+	    List<Integer> checkRows = documents.getCheckRows ();
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("undocheckout checkRows is -> " + checkRows);
 	    }
+	    Assert.notNull (checkRows,"no choose rows...");
+	    List<Document> docList = documents.getDocuments ();
 	    for (int i = 0; i < docList.size (); i++) {
+		if (!checkRows.contains (i)) {
+		    continue;
+		}
 		Document document = docList.get (i);
 		if (logger.isDebugEnabled ()) {
 		    logger.debug ("current processor order is ->  " + ( i + 1 ));
 		}
-		Assert.notNull (document,"Error to get document");
 		// save or update EPMDocument and related WTPart
 		WTObject [] objects = CADHelper.saveDocAndPart (document);
 		if (logger.isDebugEnabled ()) {
@@ -129,7 +174,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 	}
 	return result;
     }
-    
+
     public static HandleResult<List<SimpleDocument>> undoCheckout(Documents documents) {
 	HandleResult<List<SimpleDocument>> result = null;
 	Transaction tran = null;
@@ -139,18 +184,21 @@ public class ServerUtils implements RemoteAccess, Serializable {
 
 	    Assert.notNull (documents,"Error to get documents");
 	    Assert.notNull (documents.getDocuments (),"Error to getDocuments of documents");
-
-	    List<Document> docList = documents.getDocuments ();
-	    if (logger.isInfoEnabled ()) {
-		logger.info ("undo check in dwg count is -> " + ( docList == null ? "docList is null " : docList.size () ));
+	    List<Integer> checkRows = documents.getCheckRows ();
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("undocheckout checkRows is -> " + checkRows);
 	    }
+	    Assert.notNull (checkRows,"no choose rows...");
+	    List<Document> docList = documents.getDocuments ();
 	    List<SimpleDocument> returnList = new ArrayList<SimpleDocument> ();
 	    for (int i = 0; i < docList.size (); i++) {
+		if (!checkRows.contains (i)) {
+		    continue;
+		}
 		Document document = docList.get (i);
 		if (logger.isDebugEnabled ()) {
 		    logger.debug ("current processor order is ->  " + ( i + 1 ));
 		}
-		Assert.notNull (document,"Error to get document");
 		returnList.add (CADHelper.undoCheckout (document));
 	    }
 	    result = HandleResult.toSuccessedResult (returnList);
@@ -173,7 +221,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 	}
 	return result;
     }
-    
+
     public static HandleResult<List<SimpleDocument>> checkout(Documents documents) {
 	HandleResult<List<SimpleDocument>> result = null;
 	Transaction tran = null;
@@ -183,13 +231,17 @@ public class ServerUtils implements RemoteAccess, Serializable {
 
 	    Assert.notNull (documents,"Error to get documents");
 	    Assert.notNull (documents.getDocuments (),"Error to getDocuments of documents");
-
-	    List<Document> docList = documents.getDocuments ();
-	    if (logger.isInfoEnabled ()) {
-		logger.info ("undo check in dwg count is -> " + ( docList == null ? "docList is null " : docList.size () ));
+	    List<Integer> checkRows = documents.getCheckRows ();
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("checkout checkRows is -> " + checkRows);
 	    }
+	    Assert.notNull (checkRows,"no choose rows...");
+	    List<Document> docList = documents.getDocuments ();
 	    List<SimpleDocument> returnList = new ArrayList<SimpleDocument> ();
 	    for (int i = 0; i < docList.size (); i++) {
+		if (!checkRows.contains (i)) {
+		    continue;
+		}
 		Document document = docList.get (i);
 		if (logger.isDebugEnabled ()) {
 		    logger.debug ("current processor order is ->  " + ( i + 1 ));
