@@ -79,7 +79,7 @@ import wt.vc.wip.WorkInProgressHelper;
 import wt.vc.wip.Workable;
 
 /**
- * @author zjw 2018年10月13日下午2:13:48
+ * 2018年10月13日下午2:13:48
  */
 public class CADHelper implements RemoteAccess {
 

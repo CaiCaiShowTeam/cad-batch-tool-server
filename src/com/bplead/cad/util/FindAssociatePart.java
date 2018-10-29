@@ -10,7 +10,6 @@ import wt.part.WTPart;
 import wt.util.WTException;
 
 /**
- * @author zjw
  * 2018年10月15日上午10:56:44
  */
 public interface FindAssociatePart {

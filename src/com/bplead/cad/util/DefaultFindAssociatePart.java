@@ -13,7 +13,6 @@ import wt.part.WTPart;
 import wt.util.WTException;
 
 /**
- * @author zjw
  * 2018年10月15日上午10:58:41
  */
 public class DefaultFindAssociatePart implements FindAssociatePart {
