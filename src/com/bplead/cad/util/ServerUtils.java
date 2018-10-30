@@ -106,15 +106,25 @@ public class ServerUtils implements RemoteAccess, Serializable {
 	Container container = new Container ();
 	SimplePdmLinkProduct product = new SimplePdmLinkProduct (CommonUtils.getPersistableOid (epm.getContainer ()),
 		epm.getContainerName ());
-	SimpleFolder folder = new SimpleFolder (CommonUtils.getPersistableOid (CADHelper.getParentFolder (epm)),
-		CADHelper.getFolderPath (epm));
 	container.setProduct (product);
-	container.setFolder (folder);
 	document.setContainer (container);
 	if (WorkInProgressHelper.isCheckedOut (epm)) {
 	    document.setCadStatus (CadStatus.CHECK_OUT);
+	    if (WorkInProgressHelper.isWorkingCopy (epm)) {
+		EPMDocument originalEpm = (EPMDocument) WorkInProgressHelper.service.originalCopyOf (epm);
+		SimpleFolder folder = new SimpleFolder (CommonUtils.getPersistableOid (CADHelper.getParentFolder (originalEpm)),
+			CADHelper.getFolderPath (originalEpm));
+		container.setFolder (folder);
+	    } else {
+		SimpleFolder folder = new SimpleFolder (CommonUtils.getPersistableOid (CADHelper.getParentFolder (epm)),
+			CADHelper.getFolderPath (epm));
+		container.setFolder (folder);
+	    }
 	} else {
 	    document.setCadStatus (CadStatus.CHECK_IN);
+	    SimpleFolder folder = new SimpleFolder (CommonUtils.getPersistableOid (CADHelper.getParentFolder (epm)),
+		    CADHelper.getFolderPath (epm));
+	    container.setFolder (folder);
 	}
     }
 

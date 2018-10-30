@@ -26,10 +26,12 @@ import com.bplead.cad.bean.io.CadStatus;
 import com.bplead.cad.bean.io.Container;
 import com.bplead.cad.bean.io.Document;
 import com.bplead.cad.config.ConfigAnalyticalTool;
+import com.ptc.windchill.cadx.common.WTPartUtilities;
 import com.ptc.windchill.uwgm.common.util.PrintHelper;
 
 import priv.lee.cad.util.Assert;
 import priv.lee.cad.util.StringUtils;
+import wt.build.BuildSource;
 import wt.content.ApplicationData;
 import wt.content.ContentHelper;
 import wt.content.ContentHolder;
@@ -61,16 +63,24 @@ import wt.iba.value.service.IBAValueHelper;
 import wt.inf.container.WTContained;
 import wt.inf.container.WTContainer;
 import wt.inf.container.WTContainerRef;
+import wt.lifecycle.State;
 import wt.log4j.LogR;
 import wt.method.RemoteAccess;
 import wt.part.WTPart;
+import wt.part.WTPartStandardConfigSpec;
+import wt.pds.StatementSpec;
 import wt.query.QuerySpec;
 import wt.query.SearchCondition;
+import wt.util.WTAttributeNameIfc;
 import wt.util.WTException;
 import wt.util.WTPropertyVetoException;
+import wt.vc.Iterated;
 import wt.vc.IterationIdentifier;
 import wt.vc.VersionControlHelper;
+import wt.vc.VersionForeignKey;
 import wt.vc.VersionIdentifier;
+import wt.vc.VersionReference;
+import wt.vc.VersionToVersionLink;
 import wt.vc.Versioned;
 import wt.vc.config.ConfigSpec;
 import wt.vc.config.LatestConfigSpec;
@@ -456,6 +466,23 @@ public class CADHelper implements RemoteAccess {
 	}
 
 	return fullname.substring (start + 1);
+    }
+
+    public static WTPart getLatestWTPart(String partNumber, String view, String state) throws WTException {
+	if (partNumber == null || partNumber.equals ("")) {
+	    logger.debug ("partNumber is null ...");
+	    return null;
+	}
+
+	if (( view == null || view.equals ("") ) && ( state == null || state.equals ("") )) {
+	    logger.debug ("view and state is all null");
+	    return WTPartUtilities.getWTPart (partNumber);
+	}
+
+	WTPartStandardConfigSpec configSpec = WTPartStandardConfigSpec.newWTPartStandardConfigSpec (
+		view == null || view.equals ("") ? null : ViewHelper.service.getView (view),
+		state == null || state.equals ("") ? null : State.toState (state));
+	return WTPartUtilities.getWTPart (partNumber,configSpec);
     }
 
     public static EPMDocument getDocumentByCadName(String name) throws WTException {
@@ -844,22 +871,25 @@ public class CADHelper implements RemoteAccess {
 	    Assert.notNull (part,"releated part is null");
 	}
 
-	// First, check out the part if it is in a shared folder.
-	if (!FolderHelper.inPersonalCabinet ((CabinetBased) part)) {
-//	    part = (WTPart) checkout (part,"Part");
-	}
-	if (logger.isInfoEnabled ()) {
-	    logger.info ("构建epm文档与部件关系开始... ");
-	}
 	// do EPMBuildRule
-	EPMBuildRule rule = null;
-	if (document.getBuildType () == 0) {
-	    rule = createBuildRule (epm,part);
+	EPMBuildRule rule = getBuildRule (epm,part);
+	if (rule == null) {
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("构建epm文档与部件关系开始... ");
+	    }
+	    if (document.getBuildType () == 0) {
+		rule = createBuildRule (epm,part);
+	    } else {
+		rule = createBuildRule (epm,part,document.getBuildType ());
+	    }
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("构建epm文档与部件关系结束... ");
+	    }
 	} else {
-	    rule = createBuildRule (epm,part,document.getBuildType ());
-	}
-	if (logger.isInfoEnabled ()) {
-	    logger.info ("构建epm文档与部件关系结束... ");
+	    // First, check out the part if it is in a shared folder.
+	    if (!FolderHelper.inPersonalCabinet ((CabinetBased) part)) {
+		part = (WTPart) checkout (part,"Part");
+	    }
 	}
 
 	// Check in the part if we checked it out in order to create the build
@@ -1230,4 +1260,84 @@ public class CADHelper implements RemoteAccess {
 
 	return errorSB.toString ();
     }
+    
+    public static EPMBuildRule getBuildRule(EPMDocument document, WTPart part) throws WTException {
+
+	QuerySpec qs = new QuerySpec (EPMBuildRule.class);
+
+	qs.appendWhere (new SearchCondition (EPMBuildRule.class,WTAttributeNameIfc.ROLEA_VERSION_ID,
+		SearchCondition.EQUAL,VersionControlHelper.getBranchIdentifier (document)),new int [] { 0 });
+
+	qs.appendAnd ();
+	qs.appendWhere (new SearchCondition (EPMBuildRule.class,WTAttributeNameIfc.ROLEB_VERSION_ID,
+		SearchCondition.EQUAL,VersionControlHelper.getBranchIdentifier (part)),new int [] { 0 });
+
+	QueryResult rules = PersistenceHelper.manager.find ((StatementSpec) qs);
+	int size = rules.size ();
+	if (size == 0) {
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("No build rule is found between the document and the part.");
+	    }
+	}
+	if (size > 1) {
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("Internal Error: more than one build rule found between the given document and part, " + size);
+	    }
+	}
+	return (EPMBuildRule) rules.nextElement ();
+    }
+
+    public static EPMBuildRule getBuildRule(WTPart target) throws WTException {
+	QueryResult results = getBuildRules (target);
+	if (results.size () > 1) {
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("More than one build rule found");
+	    }
+	} else {
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("OK");
+	    }
+	}
+	return (EPMBuildRule) results.nextElement ();
+    }
+
+    public static EPMBuildRule getBuildRule(EPMDocument source) throws WTException {
+
+	QueryResult results = getBuildRules (source);
+	if (results.size () > 1) {
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("More than one build rule found");
+	    }
+	} else {
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("OK");
+	    }
+	}
+
+	return (EPMBuildRule) results.nextElement ();
+    }
+
+    public static QueryResult getBuildRules(WTPart part) throws WTException {
+	return getBuildRules_ (part);
+    }
+
+    public static QueryResult getBuildRules(EPMDocument document) throws WTException {
+	return getBuildRules_ (document);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static QueryResult getBuildRules_(Iterated object) throws WTException {
+
+	QuerySpec qs = new QuerySpec (EPMBuildRule.class);
+
+	String role = ( object instanceof BuildSource ) ? VersionToVersionLink.ROLE_AOBJECT_REF
+		: VersionToVersionLink.ROLE_BOBJECT_REF;
+
+	qs.appendWhere (new SearchCondition (EPMBuildRule.class,
+		role + "." + VersionReference.KEY + "." + VersionForeignKey.BRANCH_ID,SearchCondition.EQUAL,
+		new Long (VersionControlHelper.getBranchIdentifier (object))),new int [] { 0, -1 });
+
+	return PersistenceHelper.manager.find (qs);
+    }
+
 }

@@ -44,7 +44,7 @@ public class DefaultFindAssociatePart implements FindAssociatePart {
 	if (logger.isDebugEnabled ()) {
 	    logger.debug ("partNumber is -> " + partNumber);
 	}
-	WTPart part = PartUtils.getWTPart (partNumber);
+	WTPart part = CADHelper.getLatestWTPart (partNumber,null,null); 
 	// if part is null create
 	if (part == null) {
 	    if (logger.isInfoEnabled ()) {
