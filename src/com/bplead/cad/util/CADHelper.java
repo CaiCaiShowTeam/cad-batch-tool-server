@@ -237,13 +237,13 @@ public class CADHelper implements RemoteAccess {
 	if (model instanceof CadDocument) {
 	    cadDoc = (CadDocument) model;
 	}
-	Assert.isNull (cadDoc,"cadDoc is null");
+	Assert.notNull (cadDoc,"cadDoc is null");
 
 	WTContainer wtcontainer = getWTContainerByName (document.getContainer ().getProduct ().getName ());
-	Assert.isNull (wtcontainer,"wtcontainer is null");
+	Assert.notNull (wtcontainer,"wtcontainer is null");
 
 	Folder folder = getFolder (document.getContainer ().getFolder ().getName (),wtcontainer);
-	Assert.isNull (folder,"folder is null");
+	Assert.notNull (folder,"folder is null");
 
 	try {
 	    EPMContextHelper.setApplication (EPMApplicationType.getEPMApplicationTypeDefault ());
@@ -305,15 +305,15 @@ public class CADHelper implements RemoteAccess {
 	if (model instanceof CadDocument) {
 	    cadDoc = (CadDocument) model;
 	}
-	Assert.isNull (cadDoc,"cadDoc is null");
+	Assert.notNull (cadDoc,"cadDoc is null");
 
-	EPMDocument epmDoc = CommonUtils.getPersistable (document.getOid (),EPMDocument.class);
-	Assert.isNull (epmDoc,"epmdocument is null.");
+	EPMDocument epmDoc = getDocumentByNumber (document.getNumber ());
+	Assert.notNull (epmDoc,"epmdocument is null.");
 	EPMDocument workingCopy = null;
 	if (WorkInProgressHelper.isCheckedOut (epmDoc)) {
 	    workingCopy = (EPMDocument) WorkInProgressHelper.service.workingCopyOf (epmDoc);
 	}
-	Assert.isNull (workingCopy,"epmdocument is not checkout.");
+	Assert.notNull (workingCopy,"epmdocument is not checkout.");
 
 	// process iba attribute TODO
 	workingCopy = processIBAHolder (workingCopy,cadDoc,EPMDocument.class);
@@ -358,7 +358,7 @@ public class CADHelper implements RemoteAccess {
 		FindAssociatePart find = (FindAssociatePart) Class.forName (classConfig).newInstance ();
 		part = find.getAssociatePart (document);
 	    }
-	    Assert.isNull (part,"releated part is null");
+	    Assert.notNull (part,"releated part is null");
 	}
 
 	// First, check out the part if it is in a shared folder.
@@ -1076,8 +1076,8 @@ public class CADHelper implements RemoteAccess {
     public static Folder getFolder(String folderPath, WTContainer container) throws WTException {
 	Folder folder = null;
 
-	if (folderPath.startsWith (DEFAULT_FOLDER)) {
-	    folderPath = folderPath.replace ("/" + container.getContainerName (),DEFAULT_FOLDER);
+	if (!folderPath.startsWith (DEFAULT_FOLDER)) {
+	    folderPath = folderPath.replace ("/" + container.getName (),DEFAULT_FOLDER);
 	}
 
 	if (logger.isDebugEnabled ()) {

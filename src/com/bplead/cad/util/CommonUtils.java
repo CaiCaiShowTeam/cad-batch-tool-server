@@ -10,6 +10,7 @@ import java.util.zip.ZipOutputStream;
 
 import org.apache.commons.io.FileUtils;
 
+import com.bplead.cad.config.ConfigAnalyticalTool;
 import com.bplead.cad.constant.CustomPrompt;
 
 import priv.lee.cad.util.Assert;
@@ -163,7 +164,8 @@ public class CommonUtils {
     }
 
     public static File getShareDirectory() throws IOException {
-	String dir = getLocalProperties ().getProperty (SHARE_DIR);
+//	String dir = getLocalProperties ().getProperty (SHARE_DIR);
+	String dir = ConfigAnalyticalTool.getPropertiesValue (SHARE_DIR);
 	Assert.hasText (dir,"Share directory needs to config in wt.properties as key[" + SHARE_DIR + "]");
 
 	File file = new File (dir);

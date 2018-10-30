@@ -130,7 +130,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 
 	    List<Integer> checkRows = documents.getCheckRows ();
 	    if (logger.isDebugEnabled ()) {
-		logger.debug ("undocheckout checkRows is -> " + checkRows);
+		logger.debug ("checkin checkRows is -> " + checkRows);
 	    }
 	    Assert.notNull (checkRows,"no choose rows...");
 	    List<Document> docList = documents.getDocuments ();
