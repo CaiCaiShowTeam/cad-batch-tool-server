@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="wc" basedir="." default="all">
+	<description>wc Customization Build System</description>
+
+	<property environment="env" />
+	<property name="base-bean" location="z:/workspace/cad-tool-bean" />
+	<property name="base-core" location="z:/workspace/cad-tool-core" />
+	<property name="base-server" location="z:/workspace/cad-tool-server" />
+	<property name="base-batch-bean" location="z:/workspace/cad-batch-tool-bean" />
+	<property name="base-batch-client" location="z:/workspace/cad-batch-tool-client" />
+	<property name="base-batch-server" location="z:/workspace/cad-batch-tool-server" />
+	<property name="base-core" location="z:/workspace/cad-tool-core" />
+	<property name="wthome" location="${env.WT_HOME}" />
+	<property name="out.encoding.utf-8" value="UTF-8" />
+	<property name="out.encoding.ansi" value="ISO-8859-1" />
+
+	<!--
+	<target name="all" depends="check_path, dist, rb, jc, loaddata" />
+	-->
+	<target name="all" depends="check_path, dist" />
+
+	<!--
+		Clean Custom Code
+	-->
+	<target name="clean" depends="check_path">
+		<delete dir="${wthome}/codebase/com/bplead" />
+		<delete dir="${wthome}/src/com/bplead" />
+	</target>
+
+	<!--
+		Copy Non-java and Non-rbInfo Files
+	-->
+	<target name="dist" depends="check_path, i_dist_new" />
+	<target name="i_dist_old">
+		<copy todir="${wthome}/src">
+			<fileset dir="${base-bean}/src">
+				<include name="**/*.rbInfo" />
+				<include name="**/*.java" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-bean}/bin">
+				<include name="**/*.class" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase/WEB-INF/lib" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-bean}/lib">
+				<include name="*.jar" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/src">
+			<fileset dir="${base-core}/src">
+				<include name="**/*.rbInfo" />
+				<include name="**/*.java" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-core}/bin">
+				<include name="**/*.class" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase/WEB-INF/lib" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-core}/lib">
+				<include name="*.jar" />
+				<exclude name="wnc-*.jar" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/src">
+			<fileset dir="${base-server}/src">
+				<include name="**/*.rbInfo" />
+				<include name="**/*.java" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-server}/bin">
+				<include name="**/*.class" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase/WEB-INF/lib" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-server}/lib">
+				<include name="*.jar" />
+				<exclude name="wnc-*.jar" />
+			</fileset>
+		</copy>
+	</target>
+
+	<target name="i_dist_new">
+		<copy todir="${wthome}/src">
+			<fileset dir="${base-batch-bean}/src">
+				<include name="**/*.rbInfo" />
+				<include name="**/*.java" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-batch-bean}/bin">
+				<include name="**/*.class" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase/WEB-INF/lib" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-batch-bean}/lib">
+				<include name="*.jar" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/src">
+			<fileset dir="${base-core}/src">
+				<include name="**/*.rbInfo" />
+				<include name="**/*.java" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-core}/bin">
+				<include name="**/*.class" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase/WEB-INF/lib" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-core}/lib">
+				<include name="*.jar" />
+				<exclude name="wnc-*.jar" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/src">
+			<fileset dir="${base-batch-server}/src">
+				<include name="**/*.rbInfo" />
+				<include name="**/*.java" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-batch-server}/bin">
+				<include name="**/*.class" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase/WEB-INF/lib" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-batch-server}/lib">
+				<include name="*.jar" />
+				<exclude name="wnc-*.jar" />
+			</fileset>
+		</copy>
+		<!--
+		<copy todir="${wthome}/src">
+			<fileset dir="${base-batch-server}/src">
+				<include name="com/bplead/cad/util/CADHelper.java" />
+				<include name="com/bplead/cad/util/ServerUtils.java" />
+				<include name="com/bplead/cad/util/Zjwtest.java" />
+			</fileset>
+		</copy>
+
+		<copy todir="${wthome}/codebase" overwrite="true" preservelastmodified="false">
+			<fileset dir="${base-batch-server}/bin">
+				<include name="com/bplead/cad/util/CADHelper*.class" />
+				<include name="com/bplead/cad/util/ServerUtils*.class" />
+				<include name="com/bplead/cad/util/Zjwtest*.class" />
+			</fileset>
+		</copy>
+		-->
+	</target>
+
+	<!--
+		Initialization
+	-->
+	<target name="init_os">
+		<condition property="is_win32">
+			<os family="windows" />
+		</condition>
+		<condition property="is_unix">
+			<os family="unix" />
+		</condition>
+	</target>
+	<target name="init_win32" depends="init_os" if="is_win32">
+		<echo message="initializing win32 commands" />
+		<property name="shell" value="cmd.exe" />
+		<property name="shopt" value="/c" />
+		<property name="ResourceBuild" value="${wthome}\bin\ResourceBuild.bat" />
+		<property name="modelInstall" value="${wthome}\bin\modelInstall.bat" />
+		<property name="windchill" value="${wthome}/bin/windchill.exe" />
+		<property name="xconfmanager" value="${wthome}\bin\xconfmanager.bat" />
+		<property name="JavaGen" value="${wthome}\bin\JavaGen.bat" />
+	</target>
+	<target name="init_unix" depends="init_os" if="is_unix">
+		<echo message="initializing unix commands" />
+		<property name="shell" value="/bin/sh" />
+		<property name="shopt" value="" />
+		<property name="ResourceBuild" value="${wthome}/bin/ResourceBuild.sh" />
+		<property name="modelInstall" value="${wthome}/bin/modelInstall.sh" />
+		<property name="windchill" value="${wthome}/bin/windchill.sh" />
+		<property name="xconfmanager" value="${wthome}/bin/xconfmanager" />
+		<property name="JavaGen" value="${wthome}/bin/JavaGen.sh" />
+	</target>
+
+	<target name="check_path" depends="init_win32, init_unix">
+		<condition property="path_correct">
+			<and>
+				<available file="${wthome}/site.xconf" />
+				<available file="${wthome}/codebase/wt.properties.xconf" />
+			</and>
+		</condition>
+		<fail message="WT_HOME not correct, should work in windchill shell." unless="path_correct" />
+	</target>
+</project>

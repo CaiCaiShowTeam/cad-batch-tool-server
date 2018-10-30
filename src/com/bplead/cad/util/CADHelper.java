@@ -4,11 +4,13 @@
 package com.bplead.cad.util;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 import org.apache.log4j.Logger;
@@ -83,48 +85,12 @@ import wt.vc.wip.Workable;
  */
 public class CADHelper implements RemoteAccess {
 
-    private static Logger logger = LogR.getLogger (CADHelper.class.getName ());
-
-    private static final String DEFAULT_FOLDER = "/Default";
-
-    public static EPMDocumentType componentType = EPMDocumentType.toEPMDocumentType ("CADCOMPONENT");
     public static EPMAuthoringAppType authorAutoCAD = EPMAuthoringAppType.toEPMAuthoringAppType ("ACAD");
 
-    public static Document initialize(CadDocument cadDocument) throws Exception {
-	if (logger.isInfoEnabled ()) {
-	    logger.info ("initialize param is -> " + cadDocument);
-	}
-	Document document = new Document ();
-	document.setObject (cadDocument);
-	// TODO
-	String number = cadDocument.getNumber ();
-	number = setExtension (number,"DWG");
-	if (logger.isDebugEnabled ()) {
-	    logger.debug ("find epmdocument by number is -> " + number);
-	}
-	EPMDocument epmDoc = getDocumentByNumber (number);
-	if (epmDoc == null) {// not exist in plm
-	    document.setCadStatus (CadStatus.NOT_EXIST);
-	} else {// exist in plm
-	    document.setCadStatus (
-		    WorkInProgressHelper.isCheckedOut (epmDoc) ? CadStatus.CHECK_OUT : CadStatus.CHECK_IN);
-	    document.setName (epmDoc.getName ());
-	    document.setNumber (epmDoc.getNumber ());
-	    document.setOid (CommonUtils.getPersistableOid (epmDoc));
-	    Container container = new Container (buildSimpleProduct (epmDoc),buildSimpleFolder (epmDoc));
-	    document.setContainer (container);
-	}
+    public static EPMDocumentType componentType = EPMDocumentType.toEPMDocumentType ("CADCOMPONENT");
 
-	return document;
-    }
-
-    public static SimplePdmLinkProduct buildSimpleProduct(WTContained wtcontained) {
-	SimplePdmLinkProduct product = new SimplePdmLinkProduct ();
-	product.setOid (CommonUtils.getPersistableOid (wtcontained.getContainer ()));
-	product.setName (wtcontained.getContainerName ());
-	product.setSelected (true);
-	return product;
-    }
+    private static final String DEFAULT_FOLDER = "/Default";
+    private static Logger logger = LogR.getLogger (CADHelper.class.getName ());
 
     public static SimpleFolder buildSimpleFolder(Foldered foldered) throws WTException {
 	SimpleFolder folder = new SimpleFolder ();
@@ -134,336 +100,12 @@ public class CADHelper implements RemoteAccess {
 	return folder;
     }
 
-    public static String getFolderPath(Foldered foldered) throws WTException {
-	Folder folder = getParentFolder (foldered);
-	String folderPath = FolderHelper.getFolderPath (folder);
-	if (folderPath != null) {
-	    folderPath = folderPath.replaceFirst ("\\A/?Default","/" + folder.getContainerName ());
-	}
-	return folderPath;
-    }
-
-    public static Folder getParentFolder(Foldered foldered) {
-	Folder folder = null;
-	if (foldered.getParentFolder () != null && foldered.getParentFolder ().getObject () != null) {
-	    folder = (Folder) foldered.getParentFolder ().getObject ();
-	} else if (foldered.getCabinet () != null) {
-	    folder = (Folder) foldered.getCabinet ().getObject ();
-	}
-	return folder;
-    }
-
-    public static EPMDocument getDocumentByNumber(String number) throws WTException {
-	return getDocumentByNumber (number,null);
-    }
-
-    @SuppressWarnings("deprecation")
-    public static EPMDocument getDocumentByNumber(String number, ConfigSpec configSpec) throws WTException {
-	if (configSpec == null) {
-	    configSpec = new LatestConfigSpec ();
-	}
-
-	QuerySpec querySpec = new QuerySpec (EPMDocument.class);
-	int [] fromIndicies = { 0, -1 };
-	querySpec.appendWhere (new SearchCondition (EPMDocument.class,EPMDocument.NUMBER,SearchCondition.EQUAL,number),
-		fromIndicies);
-	querySpec = configSpec.appendSearchCriteria (querySpec);
-
-	QueryResult qr = PersistenceHelper.manager.find (querySpec);
-	qr = configSpec.process (qr);
-
-	return (EPMDocument) ( qr.hasMoreElements () ? qr.nextElement () : null );
-    }
-
-    public static EPMDocument getDocumentByName(String name) throws WTException {
-	return getDocumentByName (name,null);
-    }
-
-    @SuppressWarnings("deprecation")
-    public static EPMDocument getDocumentByName(String name, ConfigSpec configSpec) throws WTException {
-	if (configSpec == null) {
-	    configSpec = new LatestConfigSpec ();
-	}
-
-	QuerySpec querySpec = new QuerySpec (EPMDocument.class);
-	int [] fromIndicies = { 0, -1 };
-	querySpec.appendWhere (new SearchCondition (EPMDocument.class,EPMDocument.NAME,SearchCondition.EQUAL,name),
-		fromIndicies);
-	querySpec = configSpec.appendSearchCriteria (querySpec);
-
-	QueryResult qr = PersistenceHelper.manager.find (querySpec);
-	qr = configSpec.process (qr);
-
-	return (EPMDocument) ( qr.hasMoreElements () ? qr.nextElement () : null );
-    }
-
-    public static EPMDocument getDocumentByCadName(String name) throws WTException {
-	return getDocumentByCadName (name,null);
-    }
-
-    @SuppressWarnings("deprecation")
-    public static EPMDocument getDocumentByCadName(String name, ConfigSpec configSpec) throws WTException {
-	if (configSpec == null) {
-	    configSpec = new LatestConfigSpec ();
-	}
-
-	QuerySpec querySpec = new QuerySpec (EPMDocument.class);
-	int [] fromIndicies = { 0, -1 };
-	querySpec.appendWhere (new SearchCondition (EPMDocument.class,EPMDocument.CADNAME,SearchCondition.EQUAL,name),
-		fromIndicies);
-	querySpec = configSpec.appendSearchCriteria (querySpec);
-
-	QueryResult qr = PersistenceHelper.manager.find (querySpec);
-	qr = configSpec.process (qr);
-
-	return (EPMDocument) ( qr.hasMoreElements () ? qr.nextElement () : null );
-    }
-
-    /**
-     * Create a new EPMDocument, Specify CADName , defaultUnit and log the
-     * creation to the console. If a container is given set the container for
-     * the document. If an organization is given set the organization for the
-     * document.
-     * 
-     * @throws Exception
-     */
-    public static EPMDocument createEPMDocument(Document document) throws Exception {
-	if (logger.isInfoEnabled ()) {
-	    logger.info ("Creating document param is -> " + document);
-	}
-
-	AttachmentModel model = document.getObject ();
-	CadDocument cadDoc = null;
-	if (model instanceof CadDocument) {
-	    cadDoc = (CadDocument) model;
-	}
-	Assert.notNull (cadDoc,"cadDoc is null");
-
-	WTContainer wtcontainer = getWTContainerByName (document.getContainer ().getProduct ().getName ());
-	Assert.notNull (wtcontainer,"wtcontainer is null");
-
-	Folder folder = getFolder (document.getContainer ().getFolder ().getName (),wtcontainer);
-	Assert.notNull (folder,"folder is null");
-
-	try {
-	    EPMContextHelper.setApplication (EPMApplicationType.getEPMApplicationTypeDefault ());
-	}
-	catch(WTPropertyVetoException e1) {
-	    e1.printStackTrace ();
-	}
-	// get cadName
-	List<Attachment> attachments = cadDoc.getAttachments ();
-	File shareDirectory = CommonUtils.getShareDirectory ();
-	String cadName = "";
-	for (Attachment attachment : attachments) {
-	    File file = new File (shareDirectory,attachment.getName ());
-	    Assert.isTrue (file.exists (),"File[" + file.getPath () + "] does not exist");
-	    Assert.isTrue (file.isFile (),"File[" + file.getPath () + "] is not a file");
-	    if (attachment.isPrimary ()) {
-		cadName = attachment.getName ();
-		break;
-	    }
-	}
-
-	EPMDocument epmDoc = EPMDocument.newEPMDocument (cadDoc.getNumber (),cadDoc.getName (),authorAutoCAD,
-		componentType,cadName);
-	// If the folder is null, put the document in the container's default
-	// cabinet.
-	if (folder == null && wtcontainer != null) {
-	    folder = wtcontainer.getDefaultCabinet ();
-	}
-
-	FolderHelper.assignLocation ((FolderEntry) epmDoc,folder);
-
-	try {
-	    if (wtcontainer != null) {
-		epmDoc.setContainer (wtcontainer);
-	    }
-	}
-	catch(WTPropertyVetoException e) {
-	    throw new WTException (e);
-	}
-	epmDoc = (EPMDocument) PersistenceHelper.manager.save (epmDoc);
-	if (logger.isInfoEnabled ()) {
-	    logger.info ("create document success !");
-	}
-	// process iba attribute TODO
-	epmDoc = processIBAHolder (epmDoc,cadDoc,EPMDocument.class);
-
-	// upload epmdoc content
-	epmDoc = (EPMDocument) saveContents (epmDoc,cadDoc.getAttachments ());
-
-	return CommonUtils.refresh (epmDoc,EPMDocument.class);
-    }
-
-    public static EPMDocument updateEPMDocument(Document document) throws Exception {
-	if (logger.isInfoEnabled ()) {
-	    logger.info ("Update document param is -> " + document);
-	}
-	AttachmentModel model = document.getObject ();
-	CadDocument cadDoc = null;
-	if (model instanceof CadDocument) {
-	    cadDoc = (CadDocument) model;
-	}
-	Assert.notNull (cadDoc,"cadDoc is null");
-
-	EPMDocument epmDoc = getDocumentByNumber (document.getNumber ());
-	Assert.notNull (epmDoc,"epmdocument is null.");
-	EPMDocument workingCopy = null;
-	if (WorkInProgressHelper.isCheckedOut (epmDoc)) {
-	    workingCopy = (EPMDocument) WorkInProgressHelper.service.workingCopyOf (epmDoc);
-	}
-	Assert.notNull (workingCopy,"epmdocument is not checkout.");
-
-	// process iba attribute TODO
-	workingCopy = processIBAHolder (workingCopy,cadDoc,EPMDocument.class);
-
-	// upload epmdoc content
-	workingCopy = (EPMDocument) saveContents (workingCopy,cadDoc.getAttachments ());
-
-	return CommonUtils.checkin (workingCopy,"cad toll update EPMDocument.",EPMDocument.class);
-    }
-
-    /**
-     * Create a Document, its corresponding Part, and establish a build rule
-     * between them
-     * 
-     * @throws Exception
-     */
-    @SuppressWarnings("deprecation")
-    public static WTObject [] saveDocAndPart(Document document) throws Exception {
-	// Assert.isTrue(AccessControlHelper.manager..hasAccess(document,
-	// AccessPermission.CREATE), CommonUtils
-	// .toLocalizedMessage(CustomPrompt.ACCESS_DENIED, document.getNumber(),
-	// AccessPermission.CREATE));
-	// oid exist
-	CadStatus cadStatus = document.getCadStatus ();
-	EPMDocument epm = null;
-	if (cadStatus == CadStatus.NOT_EXIST) {
-	    epm = createEPMDocument (document);
-	} else {
-	    epm = updateEPMDocument (document);
-	}
-	// related wtpart
-	WTPart part = null;
-	if (document.getRelatedPart ()) {
-	    String classConfig = ConfigAnalyticalTool.getPropertiesValue ("find_associated_part_classname");
-	    if (logger.isDebugEnabled ()) {
-		logger.debug ("find_associated_part_classname is -> " + classConfig);
-	    }
-	    if (StringUtils.isEmpty (classConfig)) {
-		DefaultFindAssociatePart find = new DefaultFindAssociatePart ();
-		part = find.getAssociatePart (document);
-	    } else {
-		FindAssociatePart find = (FindAssociatePart) Class.forName (classConfig).newInstance ();
-		part = find.getAssociatePart (document);
-	    }
-	    Assert.notNull (part,"releated part is null");
-	}
-
-	// First, check out the part if it is in a shared folder.
-	if (!FolderHelper.inPersonalCabinet ((CabinetBased) part)) {
-	    part = (WTPart) checkout (part,"Part");
-	}
-
-	// do EPMBuildRule
-	EPMBuildRule rule = null;
-	if (document.getBuildType () == 0) {
-	    rule = createBuildRule (epm,part);
-	} else {
-	    rule = createBuildRule (epm,part,document.getBuildType ());
-	}
-
-	// Check in the part if we checked it out in order to create the build
-	// rule.
-	if (WorkInProgressHelper.isCheckedOut (part)) {
-	    part = (WTPart) checkin (part,"Part");
-
-	    /*
-	     * An EPM build rule is a version to version link. When you check
-	     * out a part, the system creates a new iteration of the original
-	     * called the working copy. The working copy belongs a different
-	     * version than its original. Since the part is checked out, this
-	     * method creates a build rule to the temporary version created for
-	     * the working copy. During check in, a listener moves the build
-	     * rule to the original version. Refresh the build rule, since it
-	     * was modified during the check in.
-	     */
-	    rule = (EPMBuildRule) PersistenceHelper.manager.refresh (rule);
-	}
-
-	WTObject [] objects = new WTObject [3];
-	objects[0] = epm;
-	objects[1] = part;
-	objects[2] = rule;
-
-	return objects;
-    }
-
-    public static EPMBuildRule createBuildRule(EPMDocument source, WTPart target) throws WTException {
-	return createBuildRule (source,target,EPMBuildRule.ALL_BUILD_ROLES);
-    }
-
-    public static EPMBuildRule createBuildRule(EPMDocument source, WTPart target, int buildType) throws WTException {
-	if (logger.isInfoEnabled ()) {
-	    logger.info ("Creating build rule " + PrintHelper.printPersistable (source) + " "
-		    + PrintHelper.printPersistable (target));
-	}
-	EPMBuildRule rule = EPMBuildRule.newEPMBuildRule (source,target,buildType);
-	rule = (EPMBuildRule) PersistenceHelper.manager.save (rule);
-	if (logger.isInfoEnabled ()) {
-	    logger.info ("Creating build rule success !");
-	}
-	return rule;
-    }
-
-    public static WTPart createPart(Document document) throws WTException {
-	if (logger.isInfoEnabled ()) {
-	    logger.info ("Creating part params is -> " + document);
-	}
-
-	AttachmentModel model = document.getObject ();
-	CadDocument cadDoc = null;
-	if (model instanceof CadDocument) {
-	    cadDoc = (CadDocument) model;
-	}
-	Assert.isNull (cadDoc,"cadDoc is null");
-
-	WTContainer wtcontainer = getWTContainerByName (document.getContainer ().getProduct ().getName ());
-	Assert.isNull (wtcontainer,"wtcontainer is null");
-
-	Folder folder = getFolder (document.getContainer ().getFolder ().getName (),wtcontainer);
-	Assert.isNull (folder,"folder is null");
-
-	WTPart part = WTPart.newWTPart (removeExtension (cadDoc.getNumber ()),cadDoc.getName ());
-	View view = ViewHelper.service.getView ("Design");
-	if (view != null) {
-	    ViewHelper.assignToView (part,view);
-	}
-
-	// If the folder is null, put the part in the container's default
-	// cabinet.
-	if (folder == null && wtcontainer != null) {
-	    folder = wtcontainer.getDefaultCabinet ();
-	}
-	// set folder
-	FolderHelper.assignLocation ((FolderEntry) part,folder);
-
-	try {
-	    if (wtcontainer != null) {
-		part.setContainer (wtcontainer);
-	    }
-	}
-	catch(WTPropertyVetoException e) {
-	    throw new WTException (e);
-	}
-
-	part = (WTPart) PersistenceHelper.manager.save (part);
-
-	if (logger.isInfoEnabled ()) {
-	    logger.info ("Creating part success !");
-	}
-	return part;
+    public static SimplePdmLinkProduct buildSimpleProduct(WTContained wtcontained) {
+	SimplePdmLinkProduct product = new SimplePdmLinkProduct ();
+	product.setOid (CommonUtils.getPersistableOid (wtcontained.getContainer ()));
+	product.setName (wtcontained.getContainerName ());
+	product.setSelected (true);
+	return product;
     }
 
     public static Workable checkin(Workable object, String note) throws WTException, WTPropertyVetoException {
@@ -484,16 +126,6 @@ public class CADHelper implements RemoteAccess {
 	    logger.info ("Checking in success !");
 	}
 	return object;
-    }
-
-    public static IBAHolder readValues(IBAHolder holder, Object constraintParameter) throws WTException {
-	try {
-	    holder = IBAValueHelper.service.refreshAttributeContainer (holder,constraintParameter,null,null);
-	}
-	catch(java.rmi.RemoteException e) {
-	    throw new WTException (e);
-	}
-	return holder;
     }
 
     public static SimpleDocument checkout(Document document) throws WTException, WTPropertyVetoException {
@@ -582,79 +214,169 @@ public class CADHelper implements RemoteAccess {
 	return checkOutLinks;
     }
 
-    public static SimpleDocument undoCheckout(Document document) throws WTException, WTPropertyVetoException {
-	if (logger.isInfoEnabled ()) {
-	    logger.info ("Undo Checkout of " + document);
-	}
-	EPMDocument epm = getDocumentByNumber (document.getNumber ());
-
-	EPMDocument originalEpm = (EPMDocument) undoCheckout (epm);
-
-	SimpleDocument simpleDocument = new SimpleDocument (CommonUtils.getPersistableOid (originalEpm),
-		originalEpm.getName (),originalEpm.getNumber ());
-	simpleDocument.setCadStatus (CadStatus.CHECK_IN);
-
-	if (logger.isInfoEnabled ()) {
-	    logger.info ("Undo Checkout success !");
-	}
-	return simpleDocument;
+    public static EPMBuildRule createBuildRule(EPMDocument source, WTPart target) throws WTException {
+	return createBuildRule (source,target,EPMBuildRule.ALL_BUILD_ROLES);
     }
 
-    public static Workable undoCheckout(Workable object) throws WTException, WTPropertyVetoException {
+    public static EPMBuildRule createBuildRule(EPMDocument source, WTPart target, int buildType) throws WTException {
 	if (logger.isInfoEnabled ()) {
-	    logger.info ("Undo Checkout of " + PrintHelper.printIterated (object));
+	    logger.info ("Creating build rule " + PrintHelper.printPersistable (source) + " "
+		    + PrintHelper.printPersistable (target));
 	}
-	Workable originalCopy = WorkInProgressHelper.service.undoCheckout (object);
+	EPMBuildRule rule = EPMBuildRule.newEPMBuildRule (source,target,buildType);
+	rule = (EPMBuildRule) PersistenceHelper.manager.save (rule);
 	if (logger.isInfoEnabled ()) {
-	    logger.info ("Undo Checkout success !");
+	    logger.info ("Creating build rule success !");
 	}
-	return originalCopy;
+	return rule;
     }
 
-    public static Persistable [] undoCheckout(Persistable [] objects) throws WTException, WTPropertyVetoException {
-	return undoCheckout (objects,true);
-    }
-
-    public static Persistable [] undoCheckout(Persistable [] objects, boolean filterOriginals)
-	    throws WTException, WTPropertyVetoException {
+    /**
+     * Create a new EPMDocument, Specify CADName , defaultUnit and log the
+     * creation to the console. If a container is given set the container for
+     * the document. If an organization is given set the organization for the
+     * document.
+     * 
+     * @throws Exception
+     */
+    public static EPMDocument createEPMDocument(Document document) throws Exception {
 	if (logger.isInfoEnabled ()) {
-	    logger.info ("Undo Checkout of " + objects.length + " filterOriginals is -> " + filterOriginals);
+	    logger.info ("Creating document param is -> " + document);
 	}
-	WTArrayList toUndo = new WTArrayList ();
-	if (filterOriginals == true) {
-	    boolean [] isUndo = new boolean [objects.length];
-	    for (int i = 0; i < objects.length; i++) {
-		if (WorkInProgressHelper.isCheckedOut ((Workable) objects[i]) == true) {
-		    isUndo[i] = true;
-		    toUndo.addElement (objects[i]);
-		} else
-		    isUndo[i] = false;
+
+	AttachmentModel model = document.getObject ();
+	CadDocument cadDoc = null;
+	if (model instanceof CadDocument) {
+	    cadDoc = (CadDocument) model;
+	}
+	Assert.notNull (cadDoc,"cadDoc is null");
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("创建epm文档获取容器和文件夹开始... ");
+	}
+	WTContainer wtcontainer = getWTContainerByName (document.getContainer ().getProduct ().getName ());
+	Assert.notNull (wtcontainer,"wtcontainer is null");
+
+	Folder folder = getFolder (document.getContainer ().getFolder ().getName (),wtcontainer);
+	Assert.notNull (folder,"folder is null");
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("创建epm文档获取容器和文件夹结束... ");
+	    logger.debug ("wtcontainer is -> " + PrintHelper.printContainer (wtcontainer) + " folder is -> "
+		    + PrintHelper.printFolder (folder));
+	}
+	try {
+	    EPMContextHelper.setApplication (EPMApplicationType.getEPMApplicationTypeDefault ());
+	}
+	catch(WTPropertyVetoException e1) {
+	    e1.printStackTrace ();
+	}
+	// get cadName
+	List<Attachment> attachments = cadDoc.getAttachments ();
+	File shareDirectory = CommonUtils.getShareDirectory ();
+	String cadName = "";
+	for (Attachment attachment : attachments) {
+	    File file = new File (shareDirectory,attachment.getName ());
+	    Assert.isTrue (file.exists (),"File[" + file.getPath () + "] does not exist");
+	    Assert.isTrue (file.isFile (),"File[" + file.getPath () + "] is not a file");
+	    if (attachment.isPrimary ()) {
+		cadName = attachment.getRealName ();
+		break;
 	    }
-	    if (toUndo.size () > 0) {
-		Persistable [] temp = new Persistable [toUndo.size ()];
-		WTCollection undone = undoCheckouts (toUndo);
-		temp = undone.toArray (temp);
-		int iUndo = 0;
-		for (int i = 0; i < isUndo.length; i++) {
-		    if (isUndo[i] == true) objects[i] = temp[iUndo++];
-		}
+	}
+
+	EPMDocument epmDoc = EPMDocument.newEPMDocument (cadDoc.getNumber (),cadDoc.getName (),authorAutoCAD,
+		componentType,cadName);
+	// If the folder is null, put the document in the container's default
+	// cabinet.
+	if (folder == null && wtcontainer != null) {
+	    folder = wtcontainer.getDefaultCabinet ();
+	}
+
+	FolderHelper.assignLocation ((FolderEntry) epmDoc,folder);
+
+	try {
+	    if (wtcontainer != null) {
+		epmDoc.setContainer (wtcontainer);
 	    }
-	} else {
-	    for (int i = 0; i < objects.length; i++) {
-		toUndo.addElement (objects[i]);
-	    }
-	    WTCollection undone = undoCheckouts (toUndo);
-	    objects = undone.toArray (objects);
+	}
+	catch(WTPropertyVetoException e) {
+	    throw new WTException (e);
+	}
+	epmDoc = (EPMDocument) PersistenceHelper.manager.save (epmDoc);
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("create document success !");
 	}
 	if (logger.isInfoEnabled ()) {
-	    logger.info ("Undo Checkout success !");
+	    logger.info ("创建epm文档处理IBA属性开始... ");
 	}
-	return objects;
+	// process iba attribute
+	epmDoc = processIBAHolder (epmDoc,cadDoc,EPMDocument.class);
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("创建epm文档处理IBA属性结束... ");
+	}
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("创建epm文档处理主内容文件开始... ");
+	}
+	// upload epmdoc content
+	epmDoc = (EPMDocument) saveContents (epmDoc,cadDoc.getAttachments ());
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("创建epm文档处理主内容文件结束... ");
+	}
+	return CommonUtils.refresh (epmDoc,EPMDocument.class);
     }
 
-    public static WTCollection undoCheckouts(WTCollection objects) throws WTException, WTPropertyVetoException {
-	WTCollection undone = WorkInProgressHelper.service.undoCheckouts (objects);
-	return undone;
+    public static WTPart createPart(Document document) throws WTException {
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("Creating part params is -> " + document);
+	}
+
+	AttachmentModel model = document.getObject ();
+	CadDocument cadDoc = null;
+	if (model instanceof CadDocument) {
+	    cadDoc = (CadDocument) model;
+	}
+	Assert.notNull (cadDoc,"cadDoc is null");
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("创建epm文档关联部件获取容器和文件夹开始...");
+	}
+	WTContainer wtcontainer = getWTContainerByName (document.getContainer ().getProduct ().getName ());
+	Assert.notNull (wtcontainer,"wtcontainer is null");
+
+	Folder folder = getFolder (document.getContainer ().getFolder ().getName (),wtcontainer);
+	Assert.notNull (folder,"folder is null");
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("创建epm文档关联部件获取容器和文件夹结束...");
+	    logger.debug ("createPart wtcontainer is -> " + PrintHelper.printContainer (wtcontainer) + " folder is -> "
+		    + PrintHelper.printFolder (folder));
+	}
+	WTPart part = WTPart.newWTPart (removeExtension (cadDoc.getNumber ()),cadDoc.getName ());
+	View view = ViewHelper.service.getView ("Design");
+	if (view != null) {
+	    ViewHelper.assignToView (part,view);
+	}
+
+	// If the folder is null, put the part in the container's default
+	// cabinet.
+	if (folder == null && wtcontainer != null) {
+	    folder = wtcontainer.getDefaultCabinet ();
+	}
+	// set folder
+	FolderHelper.assignLocation ((FolderEntry) part,folder);
+
+	try {
+	    if (wtcontainer != null) {
+		part.setContainer (wtcontainer);
+	    }
+	}
+	catch(WTPropertyVetoException e) {
+	    throw new WTException (e);
+	}
+
+	part = (WTPart) PersistenceHelper.manager.save (part);
+
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("Creating part success !");
+	}
+	return part;
     }
 
     public static HashMap<String, String> downLoad(ContentHolder contentHolder, String targetPath, String roleType) {
@@ -711,204 +433,6 @@ public class CADHelper implements RemoteAccess {
 	return contentMap;
     }
 
-    public static <T extends IBAHolder> T processIBAHolder(IBAHolder ibaHolder, CadDocument cadDoc, Class<T> clazz)
-	    throws Exception {
-	IBAUtils ibaTool = new IBAUtils (ibaHolder);
-	setIBAValues (ibaTool,cadDoc,clazz);
-	return (T) ibaTool.updateAttributeContainer (ibaHolder,clazz);
-    }
-
-    public static void setIBAValues(IBAUtils ibaTool, CadDocument cadDoc, Class<?> clazz) {
-	Field [] fields = cadDoc.getClass ().getDeclaredFields ();
-	String ibaTarget = clazz.getSimpleName ();
-	for (Field field : fields) {
-	    try {
-		field.setAccessible (true);
-		// value is null,continue
-		Object object = field.get (cadDoc);
-		if (object == null) {
-		    continue;
-		}
-		IbaField ibaField = field.getAnnotation (IbaField.class);
-		// target() contains ibaTarget
-		if (ibaField.target ().contains (ibaTarget)) {
-		    ibaTool.setIBAValue (ibaField.ibaName (),object.toString ());
-		    if (logger.isDebugEnabled ()) {
-			logger.debug (
-				"setIBAValues iba name is -> " + ibaField.ibaName () + " iba value is -> " + object);
-		    }
-		}
-	    }
-	    catch(Exception e) {
-		e.printStackTrace ();
-	    }
-	}
-    }
-
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    public static ContentHolder saveContents(ContentHolder holder, List<Attachment> attachments)
-	    throws IOException, WTException {
-	File shareDirectory = CommonUtils.getShareDirectory ();
-	HashMap contentMap = new HashMap ();
-	HashMap secondaryMap = null;
-	for (Attachment attachment : attachments) {
-	    File file = new File (shareDirectory,attachment.getName ());
-	    Assert.isTrue (file.exists (),"File[" + file.getPath () + "] does not exist");
-	    Assert.isTrue (file.isFile (),"File[" + file.getPath () + "] is not a file");
-	    if (attachment.isPrimary ()) {
-		String [] primaryPaths = new String [] { attachment.getAbsolutePath (), "cad tool upload primary." };
-		contentMap.put ("primary",primaryPaths);
-	    } else {
-		if (secondaryMap == null) {
-		    secondaryMap = new HashMap ();
-		}
-		String [] secondaryPaths = new String [] { attachment.getAbsolutePath (),
-			"cad tool upload secondary." };
-		secondaryMap.put (attachment.getName (),secondaryPaths);
-	    }
-	}
-	if (secondaryMap != null) {
-	    contentMap.put ("secondary",secondaryMap);
-	}
-
-	upload (holder,contentMap);
-
-	return holder;
-    }
-
-    public static String upload(ContentHolder contentHolder, HashMap<String, ?> targetPathMap) throws WTException {
-	StringBuffer errorSB = new StringBuffer ();
-	logger.debug ("upload param is -> contentHolder=[" + contentHolder + "] targetPathMap=" + targetPathMap);
-	if (contentHolder == null || targetPathMap.isEmpty ()) {
-	    errorSB.append ("param is null ...... ");
-	}
-	try {
-	    if (targetPathMap.containsKey ("primary")) {
-		String [] primaryPaths = (String []) targetPathMap.get ("primary");
-		String primaryPath = primaryPaths.length > 0 ? primaryPaths[0] : "";
-		String primaryDescription = primaryPaths.length > 1 ? primaryPaths[1] : "";
-		File uploadFile = new File (primaryPath);
-		if (uploadFile.exists () && uploadFile.isFile ()) {
-		    QueryResult qrPrimary = wt.content.ContentHelper.service.getContentsByRole (contentHolder,
-			    ContentRoleType.PRIMARY);
-		    while (qrPrimary.hasMoreElements ()) {
-			ApplicationData primaryData = (ApplicationData) qrPrimary.nextElement ();
-			ContentServerHelper.service.deleteContent (contentHolder,primaryData);
-		    }
-		    ApplicationData data = ApplicationData.newApplicationData (contentHolder);
-		    data.setFileName (uploadFile.getName ());
-		    data.setFileSize (uploadFile.length ());
-		    data.setUploadedFromPath (primaryPath);
-		    data.setRole (ContentRoleType.PRIMARY);
-		    data.setDescription (primaryDescription);
-		    if (primaryPath.endsWith (".xls") || primaryPath.endsWith (".xlsx") || primaryPath.endsWith (".XLS")
-			    || primaryPath.endsWith (".XLSX")) {
-			data.setFormat (DataFormatReference
-				.newDataFormatReference (ContentHelper.service.getFormatByName ("Microsoft Excel")));
-		    } else if (primaryPath.endsWith (".doc") || primaryPath.endsWith (".docx")
-			    || primaryPath.endsWith (".DOC") || primaryPath.endsWith (".DOCX")) {
-			data.setFormat (DataFormatReference
-				.newDataFormatReference (ContentHelper.service.getFormatByName ("Microsoft Word")));
-		    } else if (primaryPath.endsWith (".pdf") || primaryPath.endsWith (".PDF")) {
-			data.setFormat (DataFormatReference
-				.newDataFormatReference (ContentHelper.service.getFormatByName ("PDF")));
-		    } else if (primaryPath.endsWith (".dwg") || primaryPath.endsWith (".DWG")) {
-			data.setFormat (DataFormatReference
-				.newDataFormatReference (ContentHelper.service.getFormatByName ("DWG")));
-		    }
-		    ContentServerHelper.service.updateContent (contentHolder,data,primaryPath);
-		    // 上传完成后删除
-		    uploadFile.deleteOnExit ();
-		} else {
-		    errorSB.append ("new file=[" + primaryPath + "] is not exist ...");
-		}
-	    }
-
-	    if (targetPathMap.containsKey ("secondary")) {
-		HashMap<?, ?> attachmentsMap = (HashMap<?, ?>) targetPathMap.get ("secondary");
-		if (attachmentsMap != null && !attachmentsMap.isEmpty ()) {
-		    QueryResult qrSecondary = wt.content.ContentHelper.service.getContentsByRole (contentHolder,
-			    ContentRoleType.SECONDARY);
-		    while (qrSecondary.hasMoreElements ()) {
-			ApplicationData secondaryData = (ApplicationData) qrSecondary.nextElement ();
-			String secondaryFile = secondaryData.getFileName ();
-			logger.debug ("secondaryFile is -> " + secondaryFile);
-			if (attachmentsMap.containsKey (secondaryFile)) {
-			    ContentServerHelper.service.deleteContent (contentHolder,secondaryData);
-			}
-		    }
-
-		    Iterator<?> iter = attachmentsMap.keySet ().iterator ();
-		    while (iter.hasNext ()) {
-			String fileName = (String) iter.next ();
-			String [] secondaryPaths = (String []) attachmentsMap.get (fileName);
-			String secondaryPath = secondaryPaths.length > 0 ? secondaryPaths[0] : "";
-			String secondaryDescription = secondaryPaths.length > 1 ? secondaryPaths[1] : "";
-			File uploadFile = new File (secondaryPath);
-			if (uploadFile.exists () && uploadFile.isFile ()) {
-			    ApplicationData data = ApplicationData.newApplicationData (contentHolder);
-			    data.setFileName (uploadFile.getName ());
-			    data.setFileSize (uploadFile.length ());
-			    data.setUploadedFromPath (secondaryPath);
-			    data.setRole (ContentRoleType.SECONDARY);
-			    data.setDescription (secondaryDescription);
-			    if (secondaryPath.endsWith (".xls") || secondaryPath.endsWith (".xlsx")
-				    || secondaryPath.endsWith (".XLS") || secondaryPath.endsWith (".XLSX")) {
-				data.setFormat (DataFormatReference.newDataFormatReference (
-					ContentHelper.service.getFormatByName ("Microsoft Excel")));
-			    } else if (secondaryPath.endsWith (".doc") || secondaryPath.endsWith (".docx")
-				    || secondaryPath.endsWith (".DOC") || secondaryPath.endsWith (".DOCX")) {
-				data.setFormat (DataFormatReference.newDataFormatReference (
-					ContentHelper.service.getFormatByName ("Microsoft Word")));
-			    } else if (secondaryPath.endsWith (".pdf") || secondaryPath.endsWith (".PDF")) {
-				data.setFormat (DataFormatReference
-					.newDataFormatReference (ContentHelper.service.getFormatByName ("PDF")));
-			    } else if (secondaryPath.endsWith (".dwg") || secondaryPath.endsWith (".DWG")) {
-				data.setFormat (DataFormatReference
-					.newDataFormatReference (ContentHelper.service.getFormatByName ("DWG")));
-			    }
-			    ContentServerHelper.service.updateContent (contentHolder,data,secondaryPath);
-			    // 上传完成后删除
-			    uploadFile.deleteOnExit ();
-			} else {
-			    errorSB.append ("new file=[" + secondaryPath + "] is not exist ...");
-			}
-		    }
-		}
-	    }
-
-	}
-	catch(Exception e) {
-	    e.printStackTrace ();
-	    if (e instanceof WTException) {
-		throw (WTException) e;
-	    } else {
-		throw new WTException (e.getLocalizedMessage ());
-	    }
-	}
-
-	return errorSB.toString ();
-    }
-
-    public static String getID(Versioned object) throws WTException, WTPropertyVetoException {
-	VersionIdentifier versionID = VersionControlHelper.getVersionIdentifier (object);
-	if (versionID == null) versionID = VersionIdentifier.newVersionIdentifier ();
-
-	IterationIdentifier iterationID = VersionControlHelper.getIterationIdentifier (object);
-	if (iterationID == null) iterationID = IterationIdentifier.newIterationIdentifier ();
-
-	StringBuffer versionLabel = new StringBuffer (versionID.getValue ());
-	versionLabel.append ('.');
-	versionLabel.append (iterationID.getValue ());
-
-	return getOID (object.getMaster ()) + versionLabel.toString ();
-    }
-
-    static long getOID(Persistable p) {
-	ObjectIdentifier oid = p.getPersistInfo ().getObjectIdentifier ();
-	return oid == null ? 0 : oid.getId ();
-    }
-
     /**
      * Get base filename from a full path filename.
      *
@@ -932,6 +456,264 @@ public class CADHelper implements RemoteAccess {
 	}
 
 	return fullname.substring (start + 1);
+    }
+
+    public static EPMDocument getDocumentByCadName(String name) throws WTException {
+	return getDocumentByCadName (name,null);
+    }
+
+    @SuppressWarnings("deprecation")
+    public static EPMDocument getDocumentByCadName(String name, ConfigSpec configSpec) throws WTException {
+	if (configSpec == null) {
+	    configSpec = new LatestConfigSpec ();
+	}
+
+	QuerySpec querySpec = new QuerySpec (EPMDocument.class);
+	int [] fromIndicies = { 0, -1 };
+	querySpec.appendWhere (new SearchCondition (EPMDocument.class,EPMDocument.CADNAME,SearchCondition.EQUAL,name),
+		fromIndicies);
+	querySpec = configSpec.appendSearchCriteria (querySpec);
+
+	QueryResult qr = PersistenceHelper.manager.find (querySpec);
+	qr = configSpec.process (qr);
+
+	return (EPMDocument) ( qr.hasMoreElements () ? qr.nextElement () : null );
+    }
+
+    public static EPMDocument getDocumentByName(String name) throws WTException {
+	return getDocumentByName (name,null);
+    }
+
+    @SuppressWarnings("deprecation")
+    public static EPMDocument getDocumentByName(String name, ConfigSpec configSpec) throws WTException {
+	if (configSpec == null) {
+	    configSpec = new LatestConfigSpec ();
+	}
+
+	QuerySpec querySpec = new QuerySpec (EPMDocument.class);
+	int [] fromIndicies = { 0, -1 };
+	querySpec.appendWhere (new SearchCondition (EPMDocument.class,EPMDocument.NAME,SearchCondition.EQUAL,name),
+		fromIndicies);
+	querySpec = configSpec.appendSearchCriteria (querySpec);
+
+	QueryResult qr = PersistenceHelper.manager.find (querySpec);
+	qr = configSpec.process (qr);
+
+	return (EPMDocument) ( qr.hasMoreElements () ? qr.nextElement () : null );
+    }
+
+    public static EPMDocument getDocumentByNumber(String number) throws WTException {
+	return getDocumentByNumber (number,null);
+    }
+
+    @SuppressWarnings("deprecation")
+    public static EPMDocument getDocumentByNumber(String number, ConfigSpec configSpec) throws WTException {
+	if (configSpec == null) {
+	    configSpec = new LatestConfigSpec ();
+	}
+
+	QuerySpec querySpec = new QuerySpec (EPMDocument.class);
+	int [] fromIndicies = { 0, -1 };
+	querySpec.appendWhere (new SearchCondition (EPMDocument.class,EPMDocument.NUMBER,SearchCondition.EQUAL,number),
+		fromIndicies);
+	querySpec = configSpec.appendSearchCriteria (querySpec);
+
+	QueryResult qr = PersistenceHelper.manager.find (querySpec);
+	qr = configSpec.process (qr);
+
+	return (EPMDocument) ( qr.hasMoreElements () ? qr.nextElement () : null );
+    }
+
+    public static EPMDocumentType getEPMDocumentType(String name) {
+	String ext = getExtension (name);
+	if (ext == null) {
+	    return EPMDocumentType.getEPMDocumentTypeDefault ();
+	}
+
+	if (ext.equalsIgnoreCase ("asm")) {
+	    return EPMDocumentType.toEPMDocumentType ("CADASSEMBLY");
+	} else if (ext.equalsIgnoreCase ("prt")) {
+	    return EPMDocumentType.toEPMDocumentType ("CADCOMPONENT");
+	} else if (ext.equalsIgnoreCase ("drw")) {
+	    return EPMDocumentType.toEPMDocumentType ("CADDRAWING");
+	} else {
+	    return EPMDocumentType.getEPMDocumentTypeDefault ();
+	}
+    }
+
+    /**
+     * Get extension from a filename.
+     *
+     * <pre>
+     *   Example Usage:
+     *    FileUtil.removeExtension( "C:\myFile.txt" )  // returns ".txt"
+     * </pre>
+     * 
+     * @param String
+     *            - name of file
+     * @return extension of filename
+     **/
+    public static String getExtension(String filename) { // NOTE: could call
+							 // WTStringUtilites.tail()
+	for (int i = filename.length () - 1; i >= 0; i--) {
+	    if (filename.charAt (i) == '.') {
+		String ext = filename.substring (i + 1,filename.length ());
+		return ext;
+	    }
+	}
+	return new String ("");
+    }
+
+    /**
+     * Return back the Folder for the specified folder path in the specified
+     * container. The Folder can be a Cabinet path (/<cabinet name> or SubFolder
+     * path (/<cabinet name/<sub folder name>).
+     */
+    public static Folder getFolder(String folderPath, WTContainer container) throws WTException {
+	Folder folder = null;
+
+	if (!folderPath.startsWith (DEFAULT_FOLDER)) {
+	    folderPath = folderPath.replace ("/" + container.getName (),DEFAULT_FOLDER);
+	}
+
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("getFolder folderPath is -> " + folderPath);
+	}
+
+	try {
+	    WTContainerRef containerRef = getWTContainerRef (container);
+	    folder = FolderHelper.service.getFolder (folderPath,containerRef);
+	}
+	catch(FolderNotFoundException fnfe) {
+	    if (logger.isDebugEnabled ()) {
+		fnfe.printStackTrace ();
+	    }
+	}
+	catch(FolderException fe) {
+	    if (logger.isDebugEnabled ()) {
+		fe.printStackTrace ();
+	    }
+	}
+	return folder;
+    }
+
+    public static String getFolderPath(Foldered foldered) throws WTException {
+	Folder folder = getParentFolder (foldered);
+	String folderPath = FolderHelper.getFolderPath (folder);
+	if (folderPath != null) {
+	    folderPath = folderPath.replaceFirst ("\\A/?Default","/" + folder.getContainerName ());
+	}
+	return folderPath;
+    }
+
+    public static String getID(Versioned object) throws WTException, WTPropertyVetoException {
+	VersionIdentifier versionID = VersionControlHelper.getVersionIdentifier (object);
+	if (versionID == null) versionID = VersionIdentifier.newVersionIdentifier ();
+
+	IterationIdentifier iterationID = VersionControlHelper.getIterationIdentifier (object);
+	if (iterationID == null) iterationID = IterationIdentifier.newIterationIdentifier ();
+
+	StringBuffer versionLabel = new StringBuffer (versionID.getValue ());
+	versionLabel.append ('.');
+	versionLabel.append (iterationID.getValue ());
+
+	return getOID (object.getMaster ()) + versionLabel.toString ();
+    }
+
+    static long getOID(Persistable p) {
+	ObjectIdentifier oid = p.getPersistInfo ().getObjectIdentifier ();
+	return oid == null ? 0 : oid.getId ();
+    }
+
+    public static Folder getParentFolder(Foldered foldered) {
+	Folder folder = null;
+	if (foldered.getParentFolder () != null && foldered.getParentFolder ().getObject () != null) {
+	    folder = (Folder) foldered.getParentFolder ().getObject ();
+	} else if (foldered.getCabinet () != null) {
+	    folder = (Folder) foldered.getCabinet ().getObject ();
+	}
+	return folder;
+    }
+
+    @SuppressWarnings("deprecation")
+    public static WTContainer getWTContainerByName(String containerName) throws WTException {
+	if (containerName == null || containerName.equals ("")) {
+	    return null;
+	}
+	QuerySpec querySpec = new QuerySpec (WTContainer.class);
+	SearchCondition sc = new SearchCondition (WTContainer.class,WTContainer.NAME,SearchCondition.EQUAL,
+		containerName);
+	querySpec.appendWhere (sc,0,-1);
+	QueryResult queryResult = PersistenceHelper.manager.find (querySpec);
+
+	if (queryResult == null) {
+	    return null;
+	}
+
+	if (queryResult.hasMoreElements ()) {
+	    return (WTContainer) queryResult.nextElement ();
+	} else {
+	    return null;
+	}
+    }
+
+    /**
+     * For the specified container object, return back it's reference object
+     */
+    public static WTContainerRef getWTContainerRef(WTContainer container) throws WTException {
+	WTContainerRef containerRef = null;
+	if (container != null) {
+	    containerRef = WTContainerRef.newWTContainerRef (container);
+	}
+	return containerRef;
+    }
+
+    public static Document initialize(CadDocument cadDocument) throws Exception {
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("initialize param is -> " + cadDocument);
+	}
+	Document document = new Document ();
+	document.setObject (cadDocument);
+	String number = cadDocument.getNumber ();
+	number = setExtension (number,"DWG");
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("find epmdocument by number is -> " + number);
+	}
+	EPMDocument epmDoc = getDocumentByNumber (number);
+	if (epmDoc == null) {// not exist in plm
+	    document.setCadStatus (CadStatus.NOT_EXIST);
+	} else {// exist in plm
+	    document.setCadStatus (
+		    WorkInProgressHelper.isCheckedOut (epmDoc) ? CadStatus.CHECK_OUT : CadStatus.CHECK_IN);
+	    document.setName (epmDoc.getName ());
+	    document.setNumber (epmDoc.getNumber ());
+	    document.setOid (CommonUtils.getPersistableOid (epmDoc));
+	    Container container = new Container (buildSimpleProduct (epmDoc),buildSimpleFolder (epmDoc));
+	    document.setContainer (container);
+	}
+
+	return document;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T extends IBAHolder> T processIBAHolder(IBAHolder ibaHolder, CadDocument cadDoc, Class<T> clazz)
+	    throws Exception {
+	IBAUtils ibaTool = new IBAUtils (ibaHolder);
+	LinkedHashMap<String, Object> ibaMap = setIBAValues (ibaTool,cadDoc,clazz);
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("ibaMap is -> " + ibaMap);
+	}
+	return (T) ibaTool.updateIBAPart2 (ibaHolder);
+    }
+
+    public static IBAHolder readValues(IBAHolder holder, Object constraintParameter) throws WTException {
+	try {
+	    holder = IBAValueHelper.service.refreshAttributeContainer (holder,constraintParameter,null,null);
+	}
+	catch(java.rmi.RemoteException e) {
+	    throw new WTException (e);
+	}
+	return holder;
     }
 
     /**
@@ -961,27 +743,149 @@ public class CADHelper implements RemoteAccess {
 	return filename;
     }
 
-    /**
-     * Get extension from a filename.
-     *
-     * <pre>
-     *   Example Usage:
-     *    FileUtil.removeExtension( "C:\myFile.txt" )  // returns ".txt"
-     * </pre>
-     * 
-     * @param String
-     *            - name of file
-     * @return extension of filename
-     **/
-    public static String getExtension(String filename) { // NOTE: could call
-							 // WTStringUtilites.tail()
-	for (int i = filename.length () - 1; i >= 0; i--) {
-	    if (filename.charAt (i) == '.') {
-		String ext = filename.substring (i + 1,filename.length ());
-		return ext;
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public static ContentHolder saveContents(ContentHolder holder, List<Attachment> attachments)
+	    throws IOException, WTException {
+	File shareDirectory = CommonUtils.getShareDirectory ();
+	HashMap contentMap = new HashMap ();
+	HashMap secondaryMap = null;
+	for (Attachment attachment : attachments) {
+	    File file = new File (shareDirectory,attachment.getName ());
+	    Assert.isTrue (file.exists (),"File[" + file.getPath () + "] does not exist");
+	    Assert.isTrue (file.isFile (),"File[" + file.getPath () + "] is not a file");
+	    if (attachment.isPrimary ()) {
+		String [] primaryPaths = new String [] { file.getAbsolutePath (), "cad tool upload primary.",
+			attachment.getRealName (), attachment.getAbsolutePath () };
+		contentMap.put ("primary",primaryPaths);
+	    } else {
+		if (secondaryMap == null) {
+		    secondaryMap = new HashMap ();
+		}
+		String [] secondaryPaths = new String [] { file.getAbsolutePath (), "cad tool upload secondary.",
+			attachment.getRealName (), attachment.getAbsolutePath () };
+		secondaryMap.put (attachment.getName (),secondaryPaths);
 	    }
 	}
-	return new String ("");
+	if (secondaryMap != null) {
+	    contentMap.put ("secondary",secondaryMap);
+	}
+
+	uploadForStream (holder,contentMap);
+
+	return holder;
+    }
+
+    /**
+     * Create a Document, its corresponding Part, and establish a build rule
+     * between them
+     * 
+     * @throws Exception
+     */
+    @SuppressWarnings("deprecation")
+    public static WTObject [] saveDocAndPart(Document document) throws Exception {
+	// Assert.isTrue(AccessControlHelper.manager..hasAccess(document,
+	// AccessPermission.CREATE), CommonUtils
+	// .toLocalizedMessage(CustomPrompt.ACCESS_DENIED, document.getNumber(),
+	// AccessPermission.CREATE));
+	// oid exist
+	CadStatus cadStatus = document.getCadStatus ();
+	EPMDocument epm = null;
+	if (cadStatus == CadStatus.NOT_EXIST) {
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("创建epm文档开始... ");
+	    }
+	    epm = createEPMDocument (document);
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("创建epm文档结束... ");
+	    }
+	} else {
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("更新epm文档开始... ");
+	    }
+	    epm = updateEPMDocument (document);
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("更新epm文档结束... ");
+	    }
+	}
+	// related wtpart
+	WTPart part = null;
+	if (document.getRelatedPart ()) {
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("获取epm文档关联部件开始... ");
+	    }
+	    String classConfig = ConfigAnalyticalTool.getPropertiesValue ("find_associated_part_classname");
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("find_associated_part_classname is -> " + classConfig);
+	    }
+	    if (StringUtils.isEmpty (classConfig)) {
+		DefaultFindAssociatePart find = new DefaultFindAssociatePart ();
+		part = find.getAssociatePart (document);
+	    } else {
+		FindAssociatePart find = (FindAssociatePart) Class.forName (classConfig).newInstance ();
+		part = find.getAssociatePart (document);
+	    }
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("获取epm文档关联部件结束... ");
+	    }
+
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("create document success !");
+	    }
+
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("创建epm文档处理IBA属性开始... ");
+	    }
+	    // process iba attribute
+	    part = processIBAHolder (part,(CadDocument) document.getObject (),WTPart.class);
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("创建epm文档处理IBA属性结束... ");
+	    }
+
+	    Assert.notNull (part,"releated part is null");
+	}
+
+	// First, check out the part if it is in a shared folder.
+	if (!FolderHelper.inPersonalCabinet ((CabinetBased) part)) {
+	    part = (WTPart) checkout (part,"Part");
+	}
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("构建epm文档与部件关系开始... ");
+	}
+	// do EPMBuildRule
+	EPMBuildRule rule = null;
+	if (document.getBuildType () == 0) {
+	    rule = createBuildRule (epm,part);
+	} else {
+	    rule = createBuildRule (epm,part,document.getBuildType ());
+	}
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("构建epm文档与部件关系结束... ");
+	}
+
+	// Check in the part if we checked it out in order to create the build
+	// rule.
+	if (WorkInProgressHelper.isCheckedOut (part)) {
+	    part = (WTPart) checkin (part,"Part");
+
+	    /*
+	     * An EPM build rule is a version to version link. When you check
+	     * out a part, the system creates a new iteration of the original
+	     * called the working copy. The working copy belongs a different
+	     * version than its original. Since the part is checked out, this
+	     * method creates a build rule to the temporary version created for
+	     * the working copy. During check in, a listener moves the build
+	     * rule to the original version. Refresh the build rule, since it
+	     * was modified during the check in.
+	     */
+	    rule = (EPMBuildRule) PersistenceHelper.manager.refresh (rule);
+	}
+
+	WTObject [] objects = new WTObject [3];
+	objects[0] = epm;
+	objects[1] = part;
+	objects[2] = rule;
+
+	return objects;
     }
 
     /**
@@ -1018,86 +922,308 @@ public class CADHelper implements RemoteAccess {
 	return newFileName;
     }
 
-    public static EPMDocumentType getEPMDocumentType(String name) {
-	String ext = getExtension (name);
-	if (ext == null) {
-	    return EPMDocumentType.getEPMDocumentTypeDefault ();
+    public static LinkedHashMap<String, Object> setIBAValues(IBAUtils ibaTool, CadDocument cadDoc, Class<?> clazz) {
+	LinkedHashMap<String, Object> ibaMap = new LinkedHashMap<String, Object> ();
+	Field [] fields = cadDoc.getClass ().getDeclaredFields ();
+	String ibaTarget = clazz.getSimpleName ();
+	for (Field field : fields) {
+	    try {
+		field.setAccessible (true);
+		// value is null,continue
+		Object object = field.get (cadDoc);
+		if (object == null) {
+		    continue;
+		}
+		// IbaField is null,continue
+		IbaField ibaField = field.getAnnotation (IbaField.class);
+		if (ibaField == null) {
+		    continue;
+		}
+		// target() contains ibaTarget
+		if (ibaField.target ().contains (ibaTarget)) {
+		    if (StringUtils.equalsIgnoreCase (ibaField.ibaName (),"default")) {
+			continue;
+		    }
+		    ibaMap.put (ibaField.ibaName (),object.toString ());
+		    ibaTool.setIBAValue (ibaField.ibaName (),object.toString ());
+		    if (logger.isDebugEnabled ()) {
+			logger.debug (
+				"setIBAValues iba name is -> " + ibaField.ibaName () + " iba value is -> " + object);
+		    }
+		}
+	    }
+	    catch(Exception e) {
+		e.printStackTrace ();
+	    }
 	}
+	return ibaMap;
+    }
 
-	if (ext.equalsIgnoreCase ("asm")) {
-	    return EPMDocumentType.toEPMDocumentType ("CADASSEMBLY");
-	} else if (ext.equalsIgnoreCase ("prt")) {
-	    return EPMDocumentType.toEPMDocumentType ("CADCOMPONENT");
-	} else if (ext.equalsIgnoreCase ("drw")) {
-	    return EPMDocumentType.toEPMDocumentType ("CADDRAWING");
+    public static SimpleDocument undoCheckout(Document document) throws WTException, WTPropertyVetoException {
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("Undo Checkout of " + document);
+	}
+	EPMDocument epm = getDocumentByNumber (document.getNumber ());
+
+	EPMDocument originalEpm = (EPMDocument) undoCheckout (epm);
+
+	SimpleDocument simpleDocument = new SimpleDocument (CommonUtils.getPersistableOid (originalEpm),
+		originalEpm.getName (),originalEpm.getNumber ());
+	simpleDocument.setCadStatus (CadStatus.CHECK_IN);
+
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("Undo Checkout success !");
+	}
+	return simpleDocument;
+    }
+
+    public static Persistable [] undoCheckout(Persistable [] objects) throws WTException, WTPropertyVetoException {
+	return undoCheckout (objects,true);
+    }
+
+    public static Persistable [] undoCheckout(Persistable [] objects, boolean filterOriginals)
+	    throws WTException, WTPropertyVetoException {
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("Undo Checkout of " + objects.length + " filterOriginals is -> " + filterOriginals);
+	}
+	WTArrayList toUndo = new WTArrayList ();
+	if (filterOriginals == true) {
+	    boolean [] isUndo = new boolean [objects.length];
+	    for (int i = 0; i < objects.length; i++) {
+		if (WorkInProgressHelper.isCheckedOut ((Workable) objects[i]) == true) {
+		    isUndo[i] = true;
+		    toUndo.addElement (objects[i]);
+		} else
+		    isUndo[i] = false;
+	    }
+	    if (toUndo.size () > 0) {
+		Persistable [] temp = new Persistable [toUndo.size ()];
+		WTCollection undone = undoCheckouts (toUndo);
+		temp = undone.toArray (temp);
+		int iUndo = 0;
+		for (int i = 0; i < isUndo.length; i++) {
+		    if (isUndo[i] == true) objects[i] = temp[iUndo++];
+		}
+	    }
 	} else {
-	    return EPMDocumentType.getEPMDocumentTypeDefault ();
+	    for (int i = 0; i < objects.length; i++) {
+		toUndo.addElement (objects[i]);
+	    }
+	    WTCollection undone = undoCheckouts (toUndo);
+	    objects = undone.toArray (objects);
 	}
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("Undo Checkout success !");
+	}
+	return objects;
     }
 
-    /**
-     * For the specified container object, return back it's reference object
-     */
-    public static WTContainerRef getWTContainerRef(WTContainer container) throws WTException {
-	WTContainerRef containerRef = null;
-	if (container != null) {
-	    containerRef = WTContainerRef.newWTContainerRef (container);
+    public static Workable undoCheckout(Workable object) throws WTException, WTPropertyVetoException {
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("Undo Checkout of " + PrintHelper.printIterated (object));
 	}
-	return containerRef;
+	Workable originalCopy = WorkInProgressHelper.service.undoCheckout (object);
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("Undo Checkout success !");
+	}
+	return originalCopy;
     }
 
-    @SuppressWarnings("deprecation")
-    public static WTContainer getWTContainerByName(String containerName) throws WTException {
-	if (containerName == null || containerName.equals ("")) {
-	    return null;
-	}
-	QuerySpec querySpec = new QuerySpec (WTContainer.class);
-	SearchCondition sc = new SearchCondition (WTContainer.class,WTContainer.NAME,SearchCondition.EQUAL,
-		containerName);
-	querySpec.appendWhere (sc,0,-1);
-	QueryResult queryResult = PersistenceHelper.manager.find (querySpec);
-
-	if (queryResult == null) {
-	    return null;
-	}
-
-	if (queryResult.hasMoreElements ()) {
-	    return (WTContainer) queryResult.nextElement ();
-	} else {
-	    return null;
-	}
+    public static WTCollection undoCheckouts(WTCollection objects) throws WTException, WTPropertyVetoException {
+	WTCollection undone = WorkInProgressHelper.service.undoCheckouts (objects);
+	return undone;
     }
 
-    /**
-     * Return back the Folder for the specified folder path in the specified
-     * container. The Folder can be a Cabinet path (/<cabinet name> or SubFolder
-     * path (/<cabinet name/<sub folder name>).
-     */
-    public static Folder getFolder(String folderPath, WTContainer container) throws WTException {
-	Folder folder = null;
-
-	if (!folderPath.startsWith (DEFAULT_FOLDER)) {
-	    folderPath = folderPath.replace ("/" + container.getName (),DEFAULT_FOLDER);
+    public static EPMDocument updateEPMDocument(Document document) throws Exception {
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("Update document param is -> " + document);
 	}
-
-	if (logger.isDebugEnabled ()) {
-	    logger.debug ("getFolder folderPath is -> " + folderPath);
+	AttachmentModel model = document.getObject ();
+	CadDocument cadDoc = null;
+	if (model instanceof CadDocument) {
+	    cadDoc = (CadDocument) model;
 	}
+	Assert.notNull (cadDoc,"cadDoc is null");
 
+	EPMDocument epmDoc = getDocumentByNumber (document.getNumber ());
+	Assert.notNull (epmDoc,"epmdocument is null.");
+	EPMDocument workingCopy = null;
+	if (WorkInProgressHelper.isCheckedOut (epmDoc)) {
+	    workingCopy = (EPMDocument) WorkInProgressHelper.service.workingCopyOf (epmDoc);
+	}
+	Assert.notNull (workingCopy,"epmdocument is not checkout.");
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("更新epm文档处理IBA属性开始... ");
+	}
+	// process iba attribute
+	workingCopy = processIBAHolder (workingCopy,cadDoc,EPMDocument.class);
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("更新epm文档处理IBA属性结束... ");
+	}
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("更新epm文档处理主内容文件开始... ");
+	}
+	// upload epmdoc content
+	workingCopy = (EPMDocument) saveContents (workingCopy,cadDoc.getAttachments ());
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("更新epm文档处理主内容文件结束... ");
+	}
+	return CommonUtils.checkin (workingCopy,"cad toll update EPMDocument.",EPMDocument.class);
+    }
+
+    public static String uploadForStream(ContentHolder contentHolder, HashMap<String, ?> targetPathMap)
+	    throws WTException {
+	StringBuffer errorSB = new StringBuffer ();
+	logger.debug ("upload param is -> contentHolder=[" + contentHolder + "] targetPathMap=" + targetPathMap);
+	if (contentHolder == null || targetPathMap.isEmpty ()) {
+	    errorSB.append ("param is null ...... ");
+	}
 	try {
-	    WTContainerRef containerRef = getWTContainerRef (container);
-	    folder = FolderHelper.service.getFolder (folderPath,containerRef);
+	    if (targetPathMap.containsKey ("primary")) {
+		String [] primaryPaths = (String []) targetPathMap.get ("primary");
+		String primaryPath = primaryPaths.length > 0 ? primaryPaths[0] : "";
+		File uploadFile = new File (primaryPath);
+		String primaryDescription = primaryPaths.length > 1 ? primaryPaths[1] : "";
+		String primaryFileName = primaryPaths.length > 2 ? primaryPaths[2] : uploadFile.getName ();
+		String uploadPath = primaryPaths.length > 3 ? primaryPaths[3] : primaryPath;
+		if (logger.isDebugEnabled ()) {
+		    logger.debug ("primaryPath is -> " + primaryPath + " primaryDescription is -> " + primaryDescription
+			    + " primaryFileName is -> " + primaryFileName + " uploadPath is -> " + uploadPath);
+		}
+		if (uploadFile.exists () && uploadFile.isFile ()) {
+		    QueryResult qrPrimary = wt.content.ContentHelper.service.getContentsByRole (contentHolder,
+			    ContentRoleType.PRIMARY);
+		    while (qrPrimary.hasMoreElements ()) {
+			ApplicationData primaryData = (ApplicationData) qrPrimary.nextElement ();
+			ContentServerHelper.service.deleteContent (contentHolder,primaryData);
+		    }
+		    ApplicationData data = ApplicationData.newApplicationData (contentHolder);
+		    data.setFileName (primaryFileName);
+		    data.setFileSize (uploadFile.length ());
+		    data.setUploadedFromPath (uploadPath);
+		    data.setRole (ContentRoleType.PRIMARY);
+		    data.setDescription (primaryDescription);
+		    if (primaryPath.endsWith (".xls") || primaryPath.endsWith (".xlsx") || primaryPath.endsWith (".XLS")
+			    || primaryPath.endsWith (".XLSX")) {
+			data.setFormat (DataFormatReference
+				.newDataFormatReference (ContentHelper.service.getFormatByName ("Microsoft Excel")));
+		    } else if (primaryPath.endsWith (".doc") || primaryPath.endsWith (".docx")
+			    || primaryPath.endsWith (".DOC") || primaryPath.endsWith (".DOCX")) {
+			data.setFormat (DataFormatReference
+				.newDataFormatReference (ContentHelper.service.getFormatByName ("Microsoft Word")));
+		    } else if (primaryPath.endsWith (".pdf") || primaryPath.endsWith (".PDF")) {
+			data.setFormat (DataFormatReference
+				.newDataFormatReference (ContentHelper.service.getFormatByName ("PDF")));
+		    } else if (primaryPath.endsWith (".dwg") || primaryPath.endsWith (".DWG")) {
+			data.setFormat (DataFormatReference
+				.newDataFormatReference (ContentHelper.service.getFormatByName ("DWG")));
+		    }
+		    FileInputStream is = new FileInputStream (uploadFile);
+		    try {
+			ContentServerHelper.service.updateContent (contentHolder,data,is);
+		    }
+		    finally {
+			is.close ();
+		    }
+		    // 上传完成后删除
+		    uploadFile.deleteOnExit ();
+		} else {
+		    errorSB.append ("new file=[" + primaryPath + "] is not exist ...");
+		}
+	    }
+
+	    if (targetPathMap.containsKey ("secondary")) {
+		HashMap<?, ?> attachmentsMap = (HashMap<?, ?>) targetPathMap.get ("secondary");
+		if (attachmentsMap != null && !attachmentsMap.isEmpty ()) {
+		    QueryResult qrSecondary = wt.content.ContentHelper.service.getContentsByRole (contentHolder,
+			    ContentRoleType.SECONDARY);
+		    while (qrSecondary.hasMoreElements ()) {
+			ApplicationData secondaryData = (ApplicationData) qrSecondary.nextElement ();
+			String secondaryFile = secondaryData.getFileName ();
+			logger.debug ("secondaryFile is -> " + secondaryFile);
+			if (attachmentsMap.containsKey (secondaryFile)) {
+			    ContentServerHelper.service.deleteContent (contentHolder,secondaryData);
+			}
+		    }
+
+		    Iterator<?> iter = attachmentsMap.keySet ().iterator ();
+		    HashMap<String, Integer> fileNames = new HashMap<String, Integer> ();
+		    while (iter.hasNext ()) {
+			String fileName = (String) iter.next ();
+			String [] secondaryPaths = (String []) attachmentsMap.get (fileName);
+			String secondaryPath = secondaryPaths.length > 0 ? secondaryPaths[0] : "";
+			String secondaryDescription = secondaryPaths.length > 1 ? secondaryPaths[1] : "";
+			File uploadFile = new File (secondaryPath);
+			String contentFileName = secondaryPaths.length > 2 ? secondaryPaths[2] : uploadFile.getName ();
+			String uploadPath = secondaryPaths.length > 3 ? secondaryPaths[3] : secondaryPath;
+			if (logger.isDebugEnabled ()) {
+			    logger.debug ("secondaryPath is -> " + secondaryPath + " secondaryDescription is -> "
+				    + secondaryDescription + " contentFileName is -> " + contentFileName
+				    + " uploadPath is -> " + uploadPath);
+			}
+			if (uploadFile.exists () && uploadFile.isFile ()) {
+			    ApplicationData data = ApplicationData.newApplicationData (contentHolder);
+			    String realFileName = contentFileName;
+			    if (fileNames.keySet ().contains (contentFileName)) {
+				Integer size = fileNames.get (contentFileName);
+				if (contentFileName.indexOf (".") > -1) {
+				    realFileName = contentFileName.substring (0,contentFileName.lastIndexOf (".")) + "-"
+					    + size + contentFileName.substring (contentFileName.lastIndexOf ("."),
+						    contentFileName.length ());
+				} else {
+				    realFileName = contentFileName.substring (0,contentFileName.length ()) + "-" + size;
+				}
+				fileNames.put (contentFileName,++size);
+			    } else {
+				realFileName = contentFileName;
+				fileNames.put (contentFileName,1);
+			    }
+			    data.setFileName (realFileName);
+			    data.setFileSize (uploadFile.length ());
+			    data.setUploadedFromPath (uploadPath);
+			    data.setRole (ContentRoleType.SECONDARY);
+			    data.setDescription (secondaryDescription);
+			    if (secondaryPath.endsWith (".xls") || secondaryPath.endsWith (".xlsx")
+				    || secondaryPath.endsWith (".XLS") || secondaryPath.endsWith (".XLSX")) {
+				data.setFormat (DataFormatReference.newDataFormatReference (
+					ContentHelper.service.getFormatByName ("Microsoft Excel")));
+			    } else if (secondaryPath.endsWith (".doc") || secondaryPath.endsWith (".docx")
+				    || secondaryPath.endsWith (".DOC") || secondaryPath.endsWith (".DOCX")) {
+				data.setFormat (DataFormatReference.newDataFormatReference (
+					ContentHelper.service.getFormatByName ("Microsoft Word")));
+			    } else if (secondaryPath.endsWith (".pdf") || secondaryPath.endsWith (".PDF")) {
+				data.setFormat (DataFormatReference
+					.newDataFormatReference (ContentHelper.service.getFormatByName ("PDF")));
+			    } else if (secondaryPath.endsWith (".dwg") || secondaryPath.endsWith (".DWG")) {
+				data.setFormat (DataFormatReference
+					.newDataFormatReference (ContentHelper.service.getFormatByName ("DWG")));
+			    }
+			    FileInputStream is = new FileInputStream (uploadFile);
+			    try {
+				ContentServerHelper.service.updateContent (contentHolder,data,is);
+			    }
+			    finally {
+				is.close ();
+			    }
+			    // 上传完成后删除
+			    uploadFile.deleteOnExit ();
+			} else {
+			    errorSB.append ("new file=[" + secondaryPath + "] is not exist ...");
+			}
+		    }
+		}
+	    }
+
 	}
-	catch(FolderNotFoundException fnfe) {
-	    if (logger.isDebugEnabled ()) {
-		fnfe.printStackTrace ();
+	catch(Exception e) {
+	    e.printStackTrace ();
+	    if (e instanceof WTException) {
+		throw (WTException) e;
+	    } else {
+		throw new WTException (e.getLocalizedMessage ());
 	    }
 	}
-	catch(FolderException fe) {
-	    if (logger.isDebugEnabled ()) {
-		fe.printStackTrace ();
-	    }
-	}
-	return folder;
+
+	return errorSB.toString ();
     }
 }
