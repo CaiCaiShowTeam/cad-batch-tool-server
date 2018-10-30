@@ -846,7 +846,7 @@ public class CADHelper implements RemoteAccess {
 
 	// First, check out the part if it is in a shared folder.
 	if (!FolderHelper.inPersonalCabinet ((CabinetBased) part)) {
-	    part = (WTPart) checkout (part,"Part");
+//	    part = (WTPart) checkout (part,"Part");
 	}
 	if (logger.isInfoEnabled ()) {
 	    logger.info ("构建epm文档与部件关系开始... ");
@@ -1049,7 +1049,11 @@ public class CADHelper implements RemoteAccess {
 	Assert.notNull (epmDoc,"epmdocument is null.");
 	EPMDocument workingCopy = null;
 	if (WorkInProgressHelper.isCheckedOut (epmDoc)) {
-	    workingCopy = (EPMDocument) WorkInProgressHelper.service.workingCopyOf (epmDoc);
+	    if (WorkInProgressHelper.isWorkingCopy (epmDoc)) {
+		workingCopy = epmDoc;
+	    } else {
+		workingCopy = (EPMDocument) WorkInProgressHelper.service.workingCopyOf (epmDoc);
+	    }
 	}
 	Assert.notNull (workingCopy,"epmdocument is not checkout.");
 	if (logger.isInfoEnabled ()) {
