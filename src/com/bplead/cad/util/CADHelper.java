@@ -900,7 +900,6 @@ public class CADHelper implements RemoteAccess {
 	    Assert.notNull (part,"releated part is null");
 	}
 
-
 	// do EPMBuildRule
 	if (logger.isDebugEnabled ()) {
 	    logger.debug ("EPMDocument is checkout. " + PrintHelper.printIterated (epm) + " status isCheckedOut is -> "
@@ -919,10 +918,12 @@ public class CADHelper implements RemoteAccess {
 	if (logger.isDebugEnabled ()) {
 	    logger.debug ("epm isWorkingCopy -> " + WorkInProgressHelper.isWorkingCopy (epm) + " part isWorkingCopy -> "
 		    + WorkInProgressHelper.isWorkingCopy (part));
-	    logger.debug (PrintHelper.printIterated (epm) + " <-和-> " + PrintHelper.printIterated (part) + " 已存在-> "
-		    + PrintHelper.printEPMBuildRule (rule));
+	    if (rule != null) {
+		logger.debug (PrintHelper.printIterated (epm) + " <-和-> " + PrintHelper.printIterated (part) + " 已存在-> "
+			+ PrintHelper.printEPMBuildRule (rule));
+	    }
 	}
-	
+
 	if (rule == null) {
 	    if (logger.isInfoEnabled ()) {
 		logger.info ("构建epm文档与部件关系开始... ");
@@ -1322,7 +1323,6 @@ public class CADHelper implements RemoteAccess {
     }
 
     public static EPMBuildRule getBuildRule(EPMDocument document, WTPart part) throws WTException {
-
 	QuerySpec qs = new QuerySpec (EPMBuildRule.class);
 
 	qs.appendWhere (new SearchCondition (EPMBuildRule.class,WTAttributeNameIfc.ROLEA_VERSION_ID,
@@ -1338,14 +1338,16 @@ public class CADHelper implements RemoteAccess {
 	    if (logger.isInfoEnabled ()) {
 		logger.info ("No build rule is found between the document and the part.");
 	    }
+	    return null;
+	} else {
+	    if (size > 1) {
+		if (logger.isInfoEnabled ()) {
+		    logger.info (
+			    "Internal Error: more than one build rule found between the given document and part, " + size);
+		}
+	    } 
+	    return (EPMBuildRule) rules.nextElement ();
 	}
-	if (size > 1) {
-	    if (logger.isInfoEnabled ()) {
-		logger.info (
-			"Internal Error: more than one build rule found between the given document and part, " + size);
-	    }
-	}
-	return (EPMBuildRule) rules.nextElement ();
     }
 
     public static EPMBuildRule getBuildRule(WTPart target) throws WTException {
