@@ -51,7 +51,6 @@ import wt.fc.QueryResult;
 import wt.fc.WTObject;
 import wt.fc.collections.WTArrayList;
 import wt.fc.collections.WTCollection;
-import wt.folder.CabinetBased;
 import wt.folder.Folder;
 import wt.folder.FolderEntry;
 import wt.folder.FolderException;
@@ -136,6 +135,44 @@ public class CADHelper implements RemoteAccess {
 	    logger.info ("Checking in success !");
 	}
 	return object;
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public static Workable [] checkin(Workable [] objects, String note) throws WTException, WTPropertyVetoException {
+	int num_objects = objects.length;
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("Multiple Checkin of " + num_objects + " objects " + note);
+	}
+	String [] notes = new String [num_objects];
+	boolean [] refreshMe = new boolean [num_objects];
+	HashMap ordering = new HashMap ();
+	for (int j = 0; j < num_objects; j++) {
+	    notes[j] = note;
+	    refreshMe[j] = ( objects[j] instanceof IBAHolder
+		    && ( (IBAHolder) objects[j] ).getAttributeContainer () != null );
+	    ordering.put (new Long (getOID (objects[j])),new Long (j));
+	}
+	WTArrayList checkinObjs = new WTArrayList (Arrays.asList (objects));
+	WTCollection checkedIn = checkin (checkinObjs,"test");
+
+	// AttributeContainers are stripped off by checkin, they must be
+	// refreshed
+	Workable [] newIterations = new Workable [objects.length];
+	Iterator i_checkedIn = checkedIn.persistableIterator ();
+	while (i_checkedIn.hasNext ()) {
+	    Persistable checkInObject = (Persistable) i_checkedIn.next ();
+	    Long longIndex = (Long) ordering.get (new Long (getOID (checkInObject)));
+	    int k = longIndex.intValue ();
+	    newIterations[k] = (Workable) checkInObject;
+	    if (refreshMe[k]) newIterations[k] = (Workable) readValues ((IBAHolder) checkInObject,null);
+	}
+	return newIterations;
+    }
+
+    // returns a WTCollection of CheckoutLink's
+    public static WTCollection checkin(WTCollection objects, String note) throws WTException, WTPropertyVetoException {
+	WTCollection checkedIn = WorkInProgressHelper.service.checkin (objects,note);
+	return checkedIn;
     }
 
     public static SimpleDocument checkout(Document document) throws WTException, WTPropertyVetoException {
@@ -808,7 +845,6 @@ public class CADHelper implements RemoteAccess {
      * 
      * @throws Exception
      */
-    @SuppressWarnings("deprecation")
     public static WTObject [] saveDocAndPart(Document document) throws Exception {
 	// Assert.isTrue(AccessControlHelper.manager..hasAccess(document,
 	// AccessPermission.CREATE), CommonUtils
@@ -852,27 +888,41 @@ public class CADHelper implements RemoteAccess {
 		part = find.getAssociatePart (document);
 	    }
 	    if (logger.isInfoEnabled ()) {
-		logger.info ("获取epm文档关联部件结束... ");
-	    }
-
-	    if (logger.isInfoEnabled ()) {
-		logger.info ("create document success !");
-	    }
-
-	    if (logger.isInfoEnabled ()) {
-		logger.info ("创建epm文档处理IBA属性开始... ");
+		logger.info ("获取epm文档关联部件结束... " + PrintHelper.printIterated (part) + " staus isCheckedOut is -> "
+			+ WorkInProgressHelper.isCheckedOut (part));
+		logger.info ("处理epm文档关联部件IBA属性开始... ");
 	    }
 	    // process iba attribute
 	    part = processIBAHolder (part,(CadDocument) document.getObject (),WTPart.class);
 	    if (logger.isInfoEnabled ()) {
-		logger.info ("创建epm文档处理IBA属性结束... ");
+		logger.info ("处理epm文档关联部件IBA属性结束... ");
 	    }
-
 	    Assert.notNull (part,"releated part is null");
 	}
 
+
 	// do EPMBuildRule
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("EPMDocument is checkout. " + PrintHelper.printIterated (epm) + " status isCheckedOut is -> "
+		    + WorkInProgressHelper.isCheckedOut (epm));
+	}
+	// First, check out the part if epmdocument is checkout state.
+	if (WorkInProgressHelper.isCheckedOut (epm)) {
+	    part = (WTPart) checkout (part,"Part");
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("由于epm文档为检出状态,所以相应要检出关联部件.检出后的关联部件为 " + PrintHelper.printIterated (part)
+			+ " status isWorkingCopy is -> " + WorkInProgressHelper.isWorkingCopy (part));
+	    }
+	}
+
 	EPMBuildRule rule = getBuildRule (epm,part);
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("epm isWorkingCopy -> " + WorkInProgressHelper.isWorkingCopy (epm) + " part isWorkingCopy -> "
+		    + WorkInProgressHelper.isWorkingCopy (part));
+	    logger.debug (PrintHelper.printIterated (epm) + " <-和-> " + PrintHelper.printIterated (part) + " 已存在-> "
+		    + PrintHelper.printEPMBuildRule (rule));
+	}
+	
 	if (rule == null) {
 	    if (logger.isInfoEnabled ()) {
 		logger.info ("构建epm文档与部件关系开始... ");
@@ -885,18 +935,24 @@ public class CADHelper implements RemoteAccess {
 	    if (logger.isInfoEnabled ()) {
 		logger.info ("构建epm文档与部件关系结束... ");
 	    }
-	} else {
-	    // First, check out the part if it is in a shared folder.
-	    if (!FolderHelper.inPersonalCabinet ((CabinetBased) part)) {
-		part = (WTPart) checkout (part,"Part");
-	    }
 	}
 
 	// Check in the part if we checked it out in order to create the build
 	// rule.
 	if (WorkInProgressHelper.isCheckedOut (part)) {
-	    part = (WTPart) checkin (part,"Part");
-
+	    if (WorkInProgressHelper.isCheckedOut (epm)) {
+		if (logger.isDebugEnabled ()) {
+		    logger.debug ("检入epm文档与关联部件...");
+		}
+		Workable [] workables = checkin (new Workable [] { part, epm },"cad tool update epmdocument.");
+		part = (WTPart) workables[0];
+		epm = (EPMDocument) workables[1];
+	    } else {
+		if (logger.isDebugEnabled ()) {
+		    logger.debug ("检入关联部件...");
+		}
+		part = (WTPart) checkin (part,"Part");
+	    }
 	    /*
 	     * An EPM build rule is a version to version link. When you check
 	     * out a part, the system creates a new iteration of the original
@@ -907,6 +963,9 @@ public class CADHelper implements RemoteAccess {
 	     * rule to the original version. Refresh the build rule, since it
 	     * was modified during the check in.
 	     */
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("刷新EPMBuildRule...");
+	    }
 	    rule = (EPMBuildRule) PersistenceHelper.manager.refresh (rule);
 	}
 
@@ -976,10 +1035,11 @@ public class CADHelper implements RemoteAccess {
 		    }
 		    ibaMap.put (ibaField.ibaName (),object.toString ());
 		    ibaTool.setIBAValue (ibaField.ibaName (),object.toString ());
-		    if (logger.isDebugEnabled ()) {
-			logger.debug (
-				"setIBAValues iba name is -> " + ibaField.ibaName () + " iba value is -> " + object);
-		    }
+		    // if (logger.isDebugEnabled ()) {
+		    // logger.debug (
+		    // "setIBAValues iba name is -> " + ibaField.ibaName () + "
+		    // iba value is -> " + object);
+		    // }
 		}
 	    }
 	    catch(Exception e) {
@@ -1102,7 +1162,7 @@ public class CADHelper implements RemoteAccess {
 	if (logger.isInfoEnabled ()) {
 	    logger.info ("更新epm文档处理主内容文件结束... ");
 	}
-	return CommonUtils.checkin (workingCopy,"cad toll update EPMDocument.",EPMDocument.class);
+	return workingCopy;
     }
 
     public static String uploadForStream(ContentHolder contentHolder, HashMap<String, ?> targetPathMap)
@@ -1260,7 +1320,7 @@ public class CADHelper implements RemoteAccess {
 
 	return errorSB.toString ();
     }
-    
+
     public static EPMBuildRule getBuildRule(EPMDocument document, WTPart part) throws WTException {
 
 	QuerySpec qs = new QuerySpec (EPMBuildRule.class);
@@ -1281,7 +1341,8 @@ public class CADHelper implements RemoteAccess {
 	}
 	if (size > 1) {
 	    if (logger.isInfoEnabled ()) {
-		logger.info ("Internal Error: more than one build rule found between the given document and part, " + size);
+		logger.info (
+			"Internal Error: more than one build rule found between the given document and part, " + size);
 	    }
 	}
 	return (EPMBuildRule) rules.nextElement ();
