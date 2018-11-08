@@ -13,6 +13,7 @@ import com.bplead.cad.bean.DataContent;
 import com.bplead.cad.bean.SimpleDocument;
 import com.bplead.cad.bean.SimpleFolder;
 import com.bplead.cad.bean.SimplePdmLinkProduct;
+import com.bplead.cad.bean.io.CADLink;
 import com.bplead.cad.bean.io.CadDocument;
 import com.bplead.cad.bean.io.CadDocuments;
 import com.bplead.cad.bean.io.CadStatus;
@@ -23,6 +24,7 @@ import com.ptc.windchill.uwgm.common.util.PrintHelper;
 
 import priv.lee.cad.bean.HandleResult;
 import priv.lee.cad.util.Assert;
+import priv.lee.cad.util.StringUtils;
 import wt.epm.EPMDocument;
 import wt.fc.QueryResult;
 import wt.fc.WTObject;
@@ -37,6 +39,8 @@ import wt.method.RemoteAccess;
 import wt.org.WTPrincipal;
 import wt.org.WTPrincipalReference;
 import wt.org.WTUser;
+import wt.part.WTPart;
+import wt.part.WTPartUsageLink;
 import wt.pdmlink.PDMLinkProduct;
 import wt.pom.Transaction;
 import wt.session.SessionHelper;
@@ -143,6 +147,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		logger.debug ("checkin checkRows is -> " + checkRows);
 	    }
 	    Assert.notNull (checkRows,"no choose rows...");
+	    
 	    List<Document> docList = documents.getDocuments ();
 	    for (int i = 0; i < docList.size (); i++) {
 		if (!checkRows.contains (i)) {
@@ -155,15 +160,50 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		// save or update EPMDocument and related WTPart
 		WTObject [] objects = CADHelper.saveDocAndPart (document);
 		if (logger.isDebugEnabled ()) {
-		    logger.debug (
-			    objects.length > 0 ? PrintHelper.printPersistable (objects[0]) : "epmdocument is null.");
+		    logger.debug (objects.length > 0 ? PrintHelper.printPersistable (objects[0]) : "epmdocument is null.");
 		    logger.debug (objects.length > 1 ? PrintHelper.printPersistable (objects[1]) : "wtpart is null.");
-		    logger.debug (
-			    objects.length > 2 ? PrintHelper.printPersistable (objects[2]) : "buildrule is null.");
+		    logger.debug (objects.length > 2 ? PrintHelper.printPersistable (objects[2]) : "buildrule is null.");
 		}
-		// build bom TODO
-
 	    }
+	    List<WTPartUsageLink> usageLinks = new ArrayList<WTPartUsageLink> ();
+	    StringBuffer buf = new StringBuffer ();
+	    // build bom TODO after of checkin 
+	    for (int i = 0; i < docList.size (); i++) {
+		if (!checkRows.contains (i)) {
+		    continue;
+		}
+		Document document = docList.get (i);
+		CadDocument cadDocument = (CadDocument) document.getObject ();
+		List<CADLink> links = cadDocument.getDetail ();
+		if (logger.isDebugEnabled ()) {
+		    logger.debug ("links is -> " + links);
+		}
+		if (links == null || links.isEmpty ()) {
+		    continue;
+		}
+		String parentNumber = cadDocument.getNumber ();
+		parentNumber = CADHelper.removeExtension (parentNumber);
+		WTPart parentPart = CADHelper.getLatestWTPart (parentNumber,"Design",null);
+		if (parentPart == null) {
+		    buf.append ("编号为[" + parentNumber + "]的部件在系统中不存在,不能为其创建BOM.");
+		    continue;
+		}
+		for (CADLink link : links) {
+		    String childNumber = link.getNumber ();
+		    WTPart childPart = CADHelper.getLatestWTPart (childNumber,"Design",null);
+		    if (childPart == null) {
+			 buf.append ("编号为[" + childNumber + "]的部件在系统中不存在,不能添加为BOM部件.");
+			 continue;
+		    }
+		    String quantity = link.getQuantity ();
+		    
+		}
+	    }
+	    
+	    if (!StringUtils.isEmpty (buf.toString ())) {
+		throw new WTException (buf.toString ());
+	    }
+	    
 	    result = HandleResult.toSuccessedResult (true);
 
 	    tran.commit ();

@@ -7,7 +7,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -65,8 +67,11 @@ import wt.inf.container.WTContainerRef;
 import wt.lifecycle.State;
 import wt.log4j.LogR;
 import wt.method.RemoteAccess;
+import wt.part.Quantity;
 import wt.part.WTPart;
+import wt.part.WTPartMaster;
 import wt.part.WTPartStandardConfigSpec;
+import wt.part.WTPartUsageLink;
 import wt.pds.StatementSpec;
 import wt.query.QuerySpec;
 import wt.query.SearchCondition;
@@ -83,6 +88,7 @@ import wt.vc.VersionToVersionLink;
 import wt.vc.Versioned;
 import wt.vc.config.ConfigSpec;
 import wt.vc.config.LatestConfigSpec;
+import wt.vc.struct.StructHelper;
 import wt.vc.views.View;
 import wt.vc.views.ViewHelper;
 import wt.vc.wip.CheckoutLink;
@@ -1402,5 +1408,62 @@ public class CADHelper implements RemoteAccess {
 
 	return PersistenceHelper.manager.find (qs);
     }
+    
+    /**
+     *   Create a WTPartUsageLink between two WTParts, and log the
+     *   creation to the console.
+     */
+    public static WTPartUsageLink createUsageLink(WTPart parent, WTPart child, double amount) throws WTException {
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("Creating usage link from " + parent.getName () + " to " + child.getName ());
+	}
+	WTPartUsageLink link = WTPartUsageLink.newWTPartUsageLink (parent,(WTPartMaster) child.getMaster ());
+	Quantity qty = Quantity.newQuantity ();
+	qty.setAmount (amount);
+	link.setQuantity (qty);
+	link = (WTPartUsageLink) PersistenceHelper.manager.save (link);
+	return link;
+    }
+    
+    public static List<WTPartUsageLink> getUsageLinks(WTPart part) throws WTException {
+	List<WTPartUsageLink> usageLinks = new ArrayList<WTPartUsageLink> ();
+	QueryResult qr = StructHelper.service.navigateUses (part,WTPartUsageLink.class, false/* onlyOtherSide */);
+	while (qr.hasMoreElements () == true) {
+	    WTPartUsageLink usageLink = (WTPartUsageLink) qr.nextElement ();
+	    usageLinks.add (usageLink);
+	}
+	return usageLinks;
+    }
+    
+    public static WTPartUsageLink getWTPartUsageLink(WTPart parentPart, WTPartMaster childPartMaster)
+	    throws WTException {
+	if (parentPart == null || childPartMaster == null) {
+	    throw new WTException ("Parent or children part is null");
+	}
 
+	Enumeration<?> usageEnum = PersistenceHelper.manager.navigate (parentPart,WTPartUsageLink.USES_ROLE,
+		WTPartUsageLink.class,false);
+
+	WTPartUsageLink partUsageLink = null;
+
+	while (usageEnum.hasMoreElements ()) {
+	    WTPartUsageLink link = (WTPartUsageLink) usageEnum.nextElement ();
+	    if (childPartMaster.equals (link.getRoleBObject ())) {
+		partUsageLink = link;
+	    }
+	    if (partUsageLink != null) {
+		break;
+	    }
+	}
+
+	// Return the first found part master (suppose to have only for each number)
+	if (partUsageLink != null) {
+	    return partUsageLink;
+	}
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("Usage not found: " + parentPart + "->" + childPartMaster);
+	}
+	return null;
+    }
+    
 }
