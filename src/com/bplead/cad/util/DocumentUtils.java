@@ -175,12 +175,12 @@ public class DocumentUtils implements RemoteAccess {
 
 	public CheckoutAndDownloadTask(EPMDocument epmdocument, File repository) {
 	    this.epmdocument = epmdocument;
-	    this.repository = new File (repository,CADHelper.removeExtension (epmdocument.getNumber ()));
+	    this.repository = new File (repository,epmdocument.getNumber ());
 	}
 
 	private void addProperties() {
 	    try {
-		File file = new File (repository,CADHelper.removeExtension (epmdocument.getNumber ()) + PROPERTIES);
+		File file = new File (repository,epmdocument.getNumber () + PROPERTIES);
 		if (!file.exists ()) {
 		    file.createNewFile ();
 		}

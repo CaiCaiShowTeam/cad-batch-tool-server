@@ -27,6 +27,7 @@ import com.bplead.cad.bean.io.CadDocument;
 import com.bplead.cad.bean.io.CadStatus;
 import com.bplead.cad.bean.io.Container;
 import com.bplead.cad.bean.io.Document;
+import com.bplead.cad.bean.io.PartCategory;
 import com.bplead.cad.config.ConfigAnalyticalTool;
 import com.ptc.windchill.cadx.common.WTPartUtilities;
 import com.ptc.windchill.uwgm.common.util.PrintHelper;
@@ -401,7 +402,7 @@ public class CADHelper implements RemoteAccess {
 	    logger.debug ("createPart wtcontainer is -> " + PrintHelper.printContainer (wtcontainer) + " folder is -> "
 		    + PrintHelper.printFolder (folder));
 	}
-	WTPart part = WTPart.newWTPart (removeExtension (cadDoc.getNumber ()),cadDoc.getName ());
+	WTPart part = WTPart.newWTPart (cadDoc.getNumber (),cadDoc.getName ());
 	View view = ViewHelper.service.getView ("Design");
 	if (view != null) {
 	    ViewHelper.assignToView (part,view);
@@ -802,16 +803,16 @@ public class CADHelper implements RemoteAccess {
      *            - name of file
      * @return filename with extension removed
      **/
-    public static String removeExtension(String filename) { // NOTE: could call
-							    // WTStringUtilites.trimTail()
-	for (int i = filename.length () - 1; i >= 0; i--) {
-	    if (filename.charAt (i) == '.') {
-		String file = filename.substring (0,i);
-		return file;
-	    }
-	}
-	return filename;
-    }
+//    public static String removeExtension(String filename) { // NOTE: could call
+//							    // WTStringUtilites.trimTail()
+//	for (int i = filename.length () - 1; i >= 0; i--) {
+//	    if (filename.charAt (i) == '.') {
+//		String file = filename.substring (0,i);
+//		return file;
+//	    }
+//	}
+//	return filename;
+//    }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public static ContentHolder saveContents(ContentHolder holder, List<Attachment> attachments)
@@ -1464,6 +1465,24 @@ public class CADHelper implements RemoteAccess {
 	    logger.debug ("Usage not found: " + parentPart + "->" + childPartMaster);
 	}
 	return null;
+    }
+    
+    public static PartCategory getPartCategory (Document document) {
+	CadDocument cadDocument = (CadDocument) document.getObject ();
+	return getPartCategory (cadDocument);
+    }
+    
+    public static PartCategory getPartCategory (CadDocument cadDocument) {
+	String number = cadDocument.getNumber ();
+	String type = cadDocument.getSource ();
+	if (!StringUtils.isEmpty (number)) {
+	    if (StringUtils.contains (type,"外购件")) {
+		return PartCategory.BUY;
+	    } else if (StringUtils.isEmpty (type) || StringUtils.contains (type,"自制件")) {
+		return PartCategory.MAKE;  
+	    }
+	}
+	return null;  
     }
     
 }

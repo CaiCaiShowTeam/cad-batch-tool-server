@@ -182,7 +182,6 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		    continue;
 		}
 		String parentNumber = cadDocument.getNumber ();
-		parentNumber = CADHelper.removeExtension (parentNumber);
 		WTPart parentPart = CADHelper.getLatestWTPart (parentNumber,"Design",null);
 		if (parentPart == null) {
 		    buf.append ("编号为[" + parentNumber + "]的部件在系统中不存在,不能为其创建BOM.");
