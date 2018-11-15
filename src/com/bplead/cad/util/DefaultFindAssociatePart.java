@@ -8,6 +8,7 @@ import org.apache.log4j.Logger;
 import com.bplead.cad.bean.io.CadDocument;
 import com.bplead.cad.bean.io.CadStatus;
 import com.bplead.cad.bean.io.Document;
+import com.bplead.cad.bean.io.PartCategory;
 
 import wt.log4j.LogR;
 import wt.part.WTPart;
@@ -40,15 +41,19 @@ public class DefaultFindAssociatePart implements FindAssociatePart {
 	if (logger.isDebugEnabled ()) {
 	    logger.debug ("getAssociatePart epmNumber is -> " + epmNumber);
 	}
-	if (logger.isDebugEnabled ()) {
-	    logger.debug ("epmNumber is -> " + epmNumber);
-	}
 	WTPart part = CADHelper.getLatestWTPart (epmNumber,"Design",null); 
 	// if part is null create
 	if (part == null) {
 	    if (logger.isInfoEnabled ()) {
 		logger.info ("系统中没有查询到编号为[" + epmNumber + "]的部件.");
 		logger.info ("创建epm文档关联部件开始...");
+	    }
+	    PartCategory category = CADHelper.getPartCategory (document);
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("category is -> " + category);
+	    }
+	    if (category == PartCategory.BUY) {
+		throw new WTException ("外购件[" + epmNumber + "]在系统中不存在.");
 	    }
 	    part = CADHelper.createPart (document);
 	    if (logger.isInfoEnabled ()) {

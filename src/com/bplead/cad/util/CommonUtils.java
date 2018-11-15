@@ -4,6 +4,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.sql.Timestamp;
+import java.util.Locale;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -28,10 +31,13 @@ import wt.part.WTPart;
 import wt.pom.PersistenceException;
 import wt.query.QueryException;
 import wt.query.QuerySpec;
+import wt.util.WTContext;
 import wt.util.WTException;
 import wt.util.WTMessage;
 import wt.util.WTProperties;
 import wt.util.WTPropertyVetoException;
+import wt.util.WTStandardDateFormat;
+import wt.util.WrappedTimestamp;
 import wt.vc.VersionControlHelper;
 import wt.vc.wip.CheckoutLink;
 import wt.vc.wip.WorkInProgressHelper;
@@ -228,5 +234,23 @@ public class CommonUtils {
 	    }
 	}
     }
+    
+	public static String transferTimestampToString(Timestamp value, String pattern, Locale locale, TimeZone time_zone) {
+		if (value == null)
+			return "";
+		if (locale == null)
+			locale = WTContext.getContext().getLocale();
+		if (time_zone == null)
+			time_zone = WTContext.getContext().getTimeZone();
+		WrappedTimestamp wtStamp = new WrappedTimestamp();
+		wtStamp.setTime(value.getTime());
+		wtStamp.setNanos(0);
+		if (pattern == null || pattern.equals("")) {
+			return WTStandardDateFormat.format(wtStamp, WTStandardDateFormat.LONG_STANDARD_DATE_FORMAT_MINUS_TIMEZONE,
+					locale, time_zone);
+		} else {
+			return WTStandardDateFormat.format(wtStamp, pattern, locale, time_zone);
+		}
+	}
 
 }

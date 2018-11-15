@@ -9,7 +9,9 @@ import java.util.ResourceBundle;
 
 import org.apache.log4j.Logger;
 
+import com.bplead.cad.bean.BOMInfo;
 import com.bplead.cad.bean.DataContent;
+import com.bplead.cad.bean.PDMInfo;
 import com.bplead.cad.bean.SimpleDocument;
 import com.bplead.cad.bean.SimpleFolder;
 import com.bplead.cad.bean.SimplePdmLinkProduct;
@@ -449,4 +451,63 @@ public class ServerUtils implements RemoteAccess, Serializable {
     public static HandleResult<List<SimpleDocument>> search(String number, String name) {
 	return HandleResult.toSuccessedResult (DocumentUtils.search (number,name));
     }
+    
+    public static HandleResult<BOMInfo> getBomDetails(String partNumber) {
+		HandleResult<BOMInfo> result = null;
+		BOMInfo bomInfo = new BOMInfo();
+		if (StringUtils.isEmpty(partNumber)) {
+			return HandleResult.toSuccessedResult(bomInfo);
+		}
+		try {
+			bomInfo = PartUtils.getBomDetail(partNumber);
+			result = HandleResult.toSuccessedResult(bomInfo);
+		} catch (Exception e) {
+			result = HandleResult.toErrorResult(e);
+			e.printStackTrace();
+		} finally {
+			if (result == null) {
+				result = HandleResult.toUnExpectedResult();
+			}
+		}
+		return result;
+	}
+
+	public static HandleResult<List<PDMInfo>> getPDMInfos() {
+		HandleResult<List<PDMInfo>> result = null;
+		try {
+			List<PDMInfo> infos = new ArrayList<PDMInfo>();
+			WTPrincipal localWTPrincipal = SessionHelper.manager.getPrincipal();
+			ContainerSpec cs = new ContainerSpec(PDMLinkProduct.class);
+			cs.setUser(WTPrincipalReference.newWTPrincipalReference(localWTPrincipal));
+			cs.setMembershipState(256);
+			QueryResult qr = WTContainerHelper.service.getContainers(cs);
+			while (qr.hasMoreElements()) {
+				PDMLinkProduct pdm = (PDMLinkProduct) qr.nextElement();
+				WTPrincipal principal = pdm.getOwner();
+				WTUser user = null;
+				if (principal instanceof WTUser) {
+					user = (WTUser) principal;
+				} else {
+					continue;
+				}
+				String modifier = user.getFullName() + "(" + user.getName() + ")";
+				String updateDate = CommonUtils.transferTimestampToString(pdm.getModifyTimestamp(), null, null, null);
+
+				PDMInfo info = new PDMInfo();
+				info.setName(pdm.getName());
+				info.setModifyTime(updateDate);
+				info.setModifier(modifier);
+				infos.add(info);
+			}
+			result = HandleResult.toSuccessedResult(infos);
+		} catch (Exception e) {
+			result = HandleResult.toErrorResult(e);
+			e.printStackTrace();
+		} finally {
+			if (result == null) {
+				result = HandleResult.toUnExpectedResult();
+			}
+		}
+		return result;
+	}
 }

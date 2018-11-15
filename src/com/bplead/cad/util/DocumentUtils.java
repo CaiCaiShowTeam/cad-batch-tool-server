@@ -143,8 +143,16 @@ public class DocumentUtils implements RemoteAccess {
     }
 
     private static SimpleDocument toSimpleDocument(WTDocumentMaster master) {
-	WTDocument document = CommonUtils.getLatestObject (master,WTDocument.class);
-	return new SimpleDocument (CommonUtils.getPersistableOid (document),document.getName (),document.getNumber ());
+		WTDocument document = CommonUtils.getLatestObject(master, WTDocument.class);
+		SimpleDocument simpleDoc = new SimpleDocument();
+		simpleDoc.setOid(CommonUtils.getPersistableOid(document));
+		simpleDoc.setName(document.getName());
+		simpleDoc.setNumber(document.getNumber());
+		simpleDoc.setVersion(
+				document.getVersionIdentifier().getValue() + "." + document.getIterationIdentifier().getValue());
+		simpleDoc.setModifyTime(CommonUtils.transferTimestampToString(document.getModifyTimestamp(), null, null, null));
+		simpleDoc.setNumber(document.getCreatorFullName() + "(" + document.getCreatorName() + ")");
+		return simpleDoc;
     }
 
     private static void validateAccess(Iterated iterated,AccessPermission permission ) {

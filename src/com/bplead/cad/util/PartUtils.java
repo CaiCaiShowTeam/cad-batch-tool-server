@@ -3,10 +3,14 @@ package com.bplead.cad.util;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.Vector;
 
 import org.apache.log4j.Logger;
 
+import com.bplead.cad.bean.BOMInfo;
+import com.bplead.cad.bean.SubBOMInfo;
 import com.bplead.cad.bean.io.CAD;
 import com.bplead.cad.bean.io.CAPP;
 import com.bplead.cad.bean.io.MPMLine;
@@ -19,10 +23,13 @@ import wt.fc.Persistable;
 import wt.fc.PersistenceHelper;
 import wt.fc.QueryResult;
 import wt.iba.definition.StringDefinition;
+import wt.iba.value.IBAHolder;
 import wt.iba.value.StringValue;
 import wt.method.RemoteAccess;
 import wt.part.WTPart;
+import wt.part.WTPartHelper;
 import wt.part.WTPartMaster;
+import wt.part.WTPartUsageLink;
 import wt.query.ArrayExpression;
 import wt.query.ConstantExpression;
 import wt.query.OrderBy;
@@ -60,7 +67,11 @@ public class PartUtils implements RemoteAccess {
 	private static final String VERSION = "VERSIONIDA2VERSIONINFO";
 	private static final String VIEW = "IDA3VIEW";
 	public static final String VIEW_M = "M";
-
+	public static final String MATERIALMODEL = "CSR_XINGHAOGUIGE";
+	public static final String SIGLETONWEIGHT = "CSR_ZHONGLIANG";
+	public static final String TOTALWEIGHT = "CSR_ZONGZHONG";
+	public static final String DESCIPTION = "CSR_BEIZHU";
+	
 	private static SubSelectExpression buildNumberSubQuery(String number) throws QueryException {
 		QuerySpec query = CommonUtils.getAdvancedQuery();
 
@@ -296,5 +307,46 @@ public class PartUtils implements RemoteAccess {
 			part = utils.updateAttributeContainer(part, WTPart.class);
 		}
 		return part;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public static BOMInfo getBomDetail(String partNumber) throws WTException {
+		BOMInfo bomInfo = new BOMInfo();
+		WTPart part = getWTPart(partNumber);
+		if (part == null) {
+			return bomInfo;
+		}
+		bomInfo.setName(part.getName());
+		bomInfo.setNumber(part.getNumber());
+		Vector<SubBOMInfo> subBomInfos = new Vector<SubBOMInfo>();
+		QueryResult qr = WTPartHelper.service.getUsesWTPartMasters(part);
+		Enumeration enumUsesWTPartMasters = qr.getObjectVectorIfc().elements();
+		while (enumUsesWTPartMasters.hasMoreElements()) {
+			WTPartUsageLink link = (WTPartUsageLink) enumUsesWTPartMasters.nextElement();
+			WTPartMaster childMaster = (WTPartMaster) link.getRoleBObject();
+			String childNumber = childMaster.getNumber();
+			String childName = childMaster.getName();
+			double partAmout = link.getQuantity().getAmount();
+			WTPart child = getWTPart(childNumber);
+			IBAUtils childUtils = new IBAUtils((IBAHolder) child);
+			String childSpecifiction = childUtils.getIBAValue(MATERIALMODEL);
+			String childWeight = childUtils.getIBAValue(SIGLETONWEIGHT);
+			IBAUtils linkUtils = new IBAUtils((IBAHolder) link);
+			String partTotalWeight = linkUtils.getIBAValue(TOTALWEIGHT);
+			String childDescription = linkUtils.getIBAValue(DESCIPTION);
+
+			SubBOMInfo childInfo = new SubBOMInfo();
+			childInfo.setNumber(childNumber);
+			childInfo.setName(childName);
+			childInfo.setQuantity(String.valueOf(partAmout));
+			childInfo.setMaterialModel(childSpecifiction);
+			childInfo.setSigletonWeight(childWeight);
+			childInfo.setTotalWeight(partTotalWeight);
+			childInfo.setDesciption(childDescription);
+			subBomInfos.add(childInfo);
+		}
+		bomInfo.setSubParts(subBomInfos);
+		return bomInfo;
+
 	}
 }
