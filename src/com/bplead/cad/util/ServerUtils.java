@@ -3,8 +3,10 @@ package com.bplead.cad.util;
 import java.io.Serializable;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.ResourceBundle;
 
 import org.apache.log4j.Logger;
@@ -28,6 +30,7 @@ import priv.lee.cad.bean.HandleResult;
 import priv.lee.cad.util.Assert;
 import priv.lee.cad.util.StringUtils;
 import wt.epm.EPMDocument;
+import wt.fc.PersistenceServerHelper;
 import wt.fc.QueryResult;
 import wt.fc.WTObject;
 import wt.folder.Folder;
@@ -41,7 +44,9 @@ import wt.method.RemoteAccess;
 import wt.org.WTPrincipal;
 import wt.org.WTPrincipalReference;
 import wt.org.WTUser;
+import wt.part.Quantity;
 import wt.part.WTPart;
+import wt.part.WTPartMaster;
 import wt.part.WTPartUsageLink;
 import wt.pdmlink.PDMLinkProduct;
 import wt.pom.Transaction;
@@ -151,6 +156,8 @@ public class ServerUtils implements RemoteAccess, Serializable {
 	    Assert.notNull (checkRows,"no choose rows...");
 	    
 	    List<Document> docList = documents.getDocuments ();
+	    //暂时存储多页图的图纸待处理
+	    LinkedHashMap<String, List<Document>> mutiMap = new LinkedHashMap<String,List<Document>> ();
 	    for (int i = 0; i < docList.size (); i++) {
 		if (!checkRows.contains (i)) {
 		    continue;
@@ -159,6 +166,24 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		if (logger.isDebugEnabled ()) {
 		    logger.debug ("current processor order is ->  " + ( i + 1 ));
 		}
+		//TODO 校验图纸编号
+		
+		CadDocument cadDocument = (CadDocument) document.getObject ();
+		Integer pageSize = Integer.valueOf (cadDocument.getPageSize ());
+		//总页码大于1说明是多页图
+		if (pageSize > 1) {
+		    String tempNumber = cadDocument.getNumber ();
+		    List<Document> tempList = mutiMap.get (tempNumber);
+		    if (tempList == null) {
+			tempList = new ArrayList<Document> ();
+			tempList.add (document);
+			mutiMap.put (tempNumber,tempList);
+		    } else {
+			tempList.add (document);
+		    }
+		    continue;
+		}
+		
 		// save or update EPMDocument and related WTPart
 		WTObject [] objects = CADHelper.saveDocAndPart (document);
 		if (logger.isDebugEnabled ()) {
@@ -167,7 +192,22 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		    logger.debug (objects.length > 2 ? PrintHelper.printPersistable (objects[2]) : "buildrule is null.");
 		}
 	    }
-	    List<WTPartUsageLink> usageLinks = new ArrayList<WTPartUsageLink> ();
+	    
+	    //处理多页图纸的检入
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("mutiMap is -> " + mutiMap);
+	    }
+	    
+	    for (Map.Entry<String, List<Document>> entry : mutiMap.entrySet ()) {
+		String number = entry.getKey ();
+		List<Document> list = entry.getValue ();
+		WTObject[] objects = CADHelper.saveDocAndPartForMuti (number,list);
+		if (logger.isDebugEnabled ()) {
+		    logger.debug (objects.length > 0 ? PrintHelper.printPersistable (objects[0]) : "wtpart is null.");
+		}
+	    }
+	    
+	    LinkedHashMap<WTPart, List<WTPartUsageLink>> usageLinkMap = new LinkedHashMap<WTPart, List<WTPartUsageLink>> ();
 	    StringBuffer buf = new StringBuffer ();
 	    // build bom TODO after of checkin 
 	    for (int i = 0; i < docList.size (); i++) {
@@ -196,13 +236,64 @@ public class ServerUtils implements RemoteAccess, Serializable {
 			 buf.append ("编号为[" + childNumber + "]的部件在系统中不存在,不能添加为BOM部件.");
 			 continue;
 		    }
-		    String quantity = link.getQuantity ();
-		    
+		    WTPart copyPart = null;
+		    if (!WorkInProgressHelper.isCheckedOut (parentPart)) {
+			copyPart = (WTPart) CADHelper.checkout (parentPart,"cad tool build bom.");
+		    } else if (!WorkInProgressHelper.isWorkingCopy (parentPart)) {
+			copyPart = (WTPart) WorkInProgressHelper.service.workingCopyOf (parentPart);
+		    }
+		    //找到父部件与子部件的usageLink
+		    WTPartUsageLink oldLink = CADHelper.getWTPartUsageLink (copyPart,(WTPartMaster) childPart.getMaster ());
+		    //新建
+		    if (oldLink == null) {
+			WTPartUsageLink usageLink = CADHelper.createUsageLink (copyPart,childPart,Double.valueOf (link.getQuantity ()));
+			List<WTPartUsageLink> usageLinks = usageLinkMap.get (copyPart);
+			if (usageLinks == null) {
+			    usageLinks = new ArrayList<WTPartUsageLink> ();
+			    usageLinks.add (usageLink);
+			    usageLinkMap.put (copyPart,usageLinks);
+			} else {
+			    usageLinks.add (usageLink);
+			}
+		    }//更新 
+		    else {
+			//更新link
+			Double newQuantity = Double.valueOf (link.getQuantity ());
+			Double oldQuantity = oldLink.getQuantity ().getAmount ();
+			if (logger.isDebugEnabled ()) {
+			    logger.debug ("newQuantity is -> " + newQuantity + " oldQuantity is -> " + oldQuantity);
+			}
+			//如果更新前后数量不一致则更新
+			if (newQuantity != oldQuantity) {
+			    Quantity quantity = Quantity.newQuantity (newQuantity,oldLink.getQuantity ().getUnit ());
+			    oldLink.setQuantity (quantity);
+			    PersistenceServerHelper.manager.update (oldLink);
+			}
+			List<WTPartUsageLink> usageLinks = usageLinkMap.get (copyPart);
+			if (usageLinks == null) {
+			    usageLinks = new ArrayList<WTPartUsageLink> ();
+			    usageLinks.add (oldLink);
+			    usageLinkMap.put (copyPart,usageLinks);
+			} else {
+			    usageLinks.add (oldLink);
+			}
+		    }
 		}
 	    }
 	    
 	    if (!StringUtils.isEmpty (buf.toString ())) {
 		throw new WTException (buf.toString ());
+	    }
+	    
+	    //检入被检出的父部件
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("usageLinkMap is -> " + usageLinkMap);
+	    }
+	    for (Map.Entry<WTPart, List<WTPartUsageLink>> entry : usageLinkMap.entrySet ()) {
+		WTPart part = entry.getKey ();
+		if (WorkInProgressHelper.isCheckedOut (part)) {
+		    CADHelper.checkin (part,"CAD工具构建BOM检入.");
+		}
 	    }
 	    
 	    result = HandleResult.toSuccessedResult (true);

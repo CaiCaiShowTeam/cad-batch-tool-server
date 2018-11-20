@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -30,6 +31,7 @@ import com.bplead.cad.bean.io.Document;
 import com.bplead.cad.bean.io.PartCategory;
 import com.bplead.cad.config.ConfigAnalyticalTool;
 import com.ptc.windchill.cadx.common.WTPartUtilities;
+import com.ptc.windchill.enterprise.part.commands.PartDocServiceCommand;
 import com.ptc.windchill.uwgm.common.util.PrintHelper;
 
 import priv.lee.cad.util.Assert;
@@ -76,6 +78,9 @@ import wt.part.WTPartUsageLink;
 import wt.pds.StatementSpec;
 import wt.query.QuerySpec;
 import wt.query.SearchCondition;
+import wt.type.ClientTypedUtility;
+import wt.type.TypeDefinitionReference;
+import wt.type.TypedUtility;
 import wt.util.WTAttributeNameIfc;
 import wt.util.WTException;
 import wt.util.WTPropertyVetoException;
@@ -104,6 +109,12 @@ public class CADHelper implements RemoteAccess {
     public static EPMAuthoringAppType authorAutoCAD = EPMAuthoringAppType.toEPMAuthoringAppType ("ACAD");
 
     public static EPMDocumentType componentType = EPMDocumentType.toEPMDocumentType ("CADCOMPONENT");
+
+    private static final String PART_MAKE = "";
+
+    private static final String PART_BUY = "";
+
+    private static final String WC_TYPE_PREFIX = "WCTYPE|";
 
     private static final String DEFAULT_FOLDER = "/Default";
     private static Logger logger = LogR.getLogger (CADHelper.class.getName ());
@@ -403,6 +414,17 @@ public class CADHelper implements RemoteAccess {
 		    + PrintHelper.printFolder (folder));
 	}
 	WTPart part = WTPart.newWTPart (cadDoc.getNumber (),cadDoc.getName ());
+
+	TypeDefinitionReference tdr = TypedUtility
+		.getTypeDefinitionReference (StringUtils.substringAfter (PART_MAKE,WC_TYPE_PREFIX));
+	if (tdr != null) {
+	    try {
+		part.setTypeDefinitionReference (tdr);
+	    }
+	    catch(WTPropertyVetoException e) {
+	    }
+	}
+
 	View view = ViewHelper.service.getView ("Design");
 	if (view != null) {
 	    ViewHelper.assignToView (part,view);
@@ -803,16 +825,17 @@ public class CADHelper implements RemoteAccess {
      *            - name of file
      * @return filename with extension removed
      **/
-//    public static String removeExtension(String filename) { // NOTE: could call
-//							    // WTStringUtilites.trimTail()
-//	for (int i = filename.length () - 1; i >= 0; i--) {
-//	    if (filename.charAt (i) == '.') {
-//		String file = filename.substring (0,i);
-//		return file;
-//	    }
-//	}
-//	return filename;
-//    }
+    // public static String removeExtension(String filename) { // NOTE: could
+    // call
+    // // WTStringUtilites.trimTail()
+    // for (int i = filename.length () - 1; i >= 0; i--) {
+    // if (filename.charAt (i) == '.') {
+    // String file = filename.substring (0,i);
+    // return file;
+    // }
+    // }
+    // return filename;
+    // }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public static ContentHolder saveContents(ContentHolder holder, List<Attachment> attachments)
@@ -853,11 +876,6 @@ public class CADHelper implements RemoteAccess {
      * @throws Exception
      */
     public static WTObject [] saveDocAndPart(Document document) throws Exception {
-	// Assert.isTrue(AccessControlHelper.manager..hasAccess(document,
-	// AccessPermission.CREATE), CommonUtils
-	// .toLocalizedMessage(CustomPrompt.ACCESS_DENIED, document.getNumber(),
-	// AccessPermission.CREATE));
-	// oid exist
 	CadStatus cadStatus = document.getCadStatus ();
 	EPMDocument epm = null;
 	if (cadStatus == CadStatus.NOT_EXIST) {
@@ -879,6 +897,7 @@ public class CADHelper implements RemoteAccess {
 	}
 	// related wtpart
 	WTPart part = null;
+	Boolean exist = false;// 是否已存在
 	if (document.getRelatedPart ()) {
 	    if (logger.isInfoEnabled ()) {
 		logger.info ("获取epm文档关联部件开始... ");
@@ -889,21 +908,34 @@ public class CADHelper implements RemoteAccess {
 	    }
 	    if (StringUtils.isEmpty (classConfig)) {
 		DefaultFindAssociatePart find = new DefaultFindAssociatePart ();
-		part = find.getAssociatePart (document);
+		Object [] findResult = find.getAssociatePart (document);
+		if (findResult.length > 0) {
+		    part = (WTPart) findResult[0];
+		}
+		if (findResult.length > 1) {
+		    exist = (Boolean) findResult[1];
+		}
 	    } else {
 		FindAssociatePart find = (FindAssociatePart) Class.forName (classConfig).newInstance ();
-		part = find.getAssociatePart (document);
+		Object [] findResult = find.getAssociatePart (document);
+		if (findResult.length > 0) {
+		    part = (WTPart) findResult[0];
+		}
+		if (findResult.length > 1) {
+		    exist = (Boolean) findResult[1];
+		}
 	    }
 	    if (logger.isInfoEnabled ()) {
 		logger.info ("获取epm文档关联部件结束... " + PrintHelper.printIterated (part) + " staus isCheckedOut is -> "
-			+ WorkInProgressHelper.isCheckedOut (part));
+			+ WorkInProgressHelper.isCheckedOut (part) + " exist is -> " + exist);
 	    }
-//	    logger.info ("处理epm文档关联部件IBA属性开始... ");
-//	    // process iba attribute
-//	    part = processIBAHolder (part,(CadDocument) document.getObject (),WTPart.class);
-//	    if (logger.isInfoEnabled ()) {
-//		logger.info ("处理epm文档关联部件IBA属性结束... ");
-//	    }
+	    // logger.info ("处理epm文档关联部件IBA属性开始... ");
+	    // // process iba attribute
+	    // part = processIBAHolder (part,(CadDocument) document.getObject
+	    // (),WTPart.class);
+	    // if (logger.isInfoEnabled ()) {
+	    // logger.info ("处理epm文档关联部件IBA属性结束... ");
+	    // }
 	    Assert.notNull (part,"releated part is null");
 	}
 
@@ -912,6 +944,15 @@ public class CADHelper implements RemoteAccess {
 	    logger.debug ("EPMDocument is checkout. " + PrintHelper.printIterated (epm) + " status isCheckedOut is -> "
 		    + WorkInProgressHelper.isCheckedOut (epm));
 	}
+
+	// 如果部件已存在,检查是否关联drw或者其他autoCAD文档
+	if (exist) {
+	    List<EPMDocument> list = get2Drawing (part);
+	    if (list != null && !list.isEmpty ()) {
+		throw new WTException ("图纸代号为[" + part.getNumber () + "]的部件在系统中已关联drw文件或者其他AutoCAD图纸.");
+	    }
+	}
+
 	// First, check out the part if epmdocument is checkout state.
 	if (WorkInProgressHelper.isCheckedOut (epm)) {
 	    part = (WTPart) checkout (part,"Part");
@@ -982,6 +1023,143 @@ public class CADHelper implements RemoteAccess {
 	objects[1] = part;
 	objects[2] = rule;
 
+	return objects;
+    }
+
+    /**
+     * Create a Document, its corresponding Part, and establish a build rule
+     * between them
+     * 
+     * @throws Exception
+     */
+    public static WTObject [] saveDocAndPartForMuti(String partNumber, List<Document> documents) throws Exception {
+	Document document0 = documents.get (0);
+	List<EPMDocument> epmList = new ArrayList<EPMDocument> ();
+	for (Document document : documents) {
+	    CadStatus cadStatus = document.getCadStatus ();
+	    EPMDocument epm = null;
+	    if (cadStatus == CadStatus.NOT_EXIST) {
+		if (logger.isInfoEnabled ()) {
+		    logger.info ("创建epm文档开始... ");
+		}
+		epm = createEPMDocument (document);
+		if (logger.isInfoEnabled ()) {
+		    logger.info ("创建epm文档结束... ");
+		}
+		epmList.add (epm);
+	    } else {
+		if (logger.isInfoEnabled ()) {
+		    logger.info ("更新epm文档开始... ");
+		}
+		epm = updateEPMDocument (document);
+		if (logger.isInfoEnabled ()) {
+		    logger.info ("更新epm文档结束... ");
+		}
+		epmList.add (epm);
+	    }
+	}
+	// related wtpart
+	WTPart part = null;
+	Boolean exist = false;// 是否已存在
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("获取epm文档关联部件开始... ");
+	}
+	String classConfig = ConfigAnalyticalTool.getPropertiesValue ("find_associated_part_classname");
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("find_associated_part_classname is -> " + classConfig);
+	}
+	if (StringUtils.isEmpty (classConfig)) {
+	    DefaultFindAssociatePart find = new DefaultFindAssociatePart ();
+	    Object [] findResult = find.getAssociatePart (partNumber,document0);
+	    if (findResult.length > 0) {
+		part = (WTPart) findResult[0];
+	    }
+	    if (findResult.length > 1) {
+		exist = (Boolean) findResult[1];
+	    }
+	} else {
+	    FindAssociatePart find = (FindAssociatePart) Class.forName (classConfig).newInstance ();
+	    Object [] findResult = find.getAssociatePart (partNumber,document0);
+	    if (findResult.length > 0) {
+		part = (WTPart) findResult[0];
+	    }
+	    if (findResult.length > 1) {
+		exist = (Boolean) findResult[1];
+	    }
+	}
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("获取epm文档关联部件结束... " + PrintHelper.printIterated (part) + " staus isCheckedOut is -> "
+		    + WorkInProgressHelper.isCheckedOut (part) + " exist is -> " + exist);
+	}
+	// logger.info ("处理epm文档关联部件IBA属性开始... ");
+	// // process iba attribute
+	// part = processIBAHolder (part,(CadDocument) document.getObject
+	// (),WTPart.class);
+	// if (logger.isInfoEnabled ()) {
+	// logger.info ("处理epm文档关联部件IBA属性结束... ");
+	// }
+	Assert.notNull (part,"releated part is null");
+
+	// 如果部件已存在,检查是否关联drw或者其他autoCAD文档
+	if (exist) {
+	    List<EPMDocument> list = get2Drawing (part);
+	    if (list != null && !list.isEmpty ()) {
+		throw new WTException ("图纸代号为[" + part.getNumber () + "]的部件在系统中已关联drw文件或者其他AutoCAD图纸.");
+	    }
+	}
+
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("下面要针对部件 " + PrintHelper.printIterated (part) + " 与EPMDocuments " + epmList + " 建立关联关系");
+	}
+
+	List<Workable> list = new ArrayList<Workable> ();
+	for (EPMDocument epmdocument : epmList) {
+	    // 当EPMDOCUMENT有一个是检出状态,那么需要检出部件
+	    if (WorkInProgressHelper.isCheckedOut (epmdocument)) {
+		list.add (epmdocument);
+		if (!WorkInProgressHelper.isCheckedOut (part)) {
+		    part = (WTPart) checkout (part,"Part");
+		    list.add (part);
+		}
+		if (logger.isDebugEnabled ()) {
+		    logger.debug ("由于epm文档为检出状态,所以相应要检出关联部件.检出后的关联部件为 " + PrintHelper.printIterated (part)
+			    + " status isWorkingCopy is -> " + WorkInProgressHelper.isWorkingCopy (part));
+		}
+	    }
+
+	    EPMBuildRule rule = getBuildRule (epmdocument,part);
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("epm isWorkingCopy -> " + WorkInProgressHelper.isWorkingCopy (epmdocument)
+			+ " part isWorkingCopy -> " + WorkInProgressHelper.isWorkingCopy (part));
+		if (rule != null) {
+		    logger.debug (PrintHelper.printIterated (epmdocument) + " <-和-> " + PrintHelper.printIterated (part)
+			    + " 已存在-> " + PrintHelper.printEPMBuildRule (rule));
+		}
+	    }
+
+	    if (rule == null) {
+		if (logger.isInfoEnabled ()) {
+		    logger.info ("构建epm文档与部件关系开始... ");
+		}
+		rule = createBuildRule (epmdocument,part,EPMBuildRule.CAD_REPRESENTATION);
+		if (logger.isInfoEnabled ()) {
+		    logger.info ("构建epm文档与部件关系结束... ");
+		}
+	    }
+	}
+
+	// Check in the part if we checked it out in order to create the build
+	// rule.
+	if (list != null && !list.isEmpty ()) {
+	    Workable [] copyWorkables = new Workable [] {};
+	    for (int i = 0; i < list.size (); i++) {
+		copyWorkables[i] = list.get (0);
+	    }
+	    checkin (copyWorkables,"cad tool update epmdocument.");
+	}
+
+	WTObject [] objects = new WTObject [1];
+	objects[0] = getLatestWTPart (part.getNumber (),"Design",null);
 	return objects;
     }
 
@@ -1349,10 +1527,10 @@ public class CADHelper implements RemoteAccess {
 	} else {
 	    if (size > 1) {
 		if (logger.isInfoEnabled ()) {
-		    logger.info (
-			    "Internal Error: more than one build rule found between the given document and part, " + size);
+		    logger.info ("Internal Error: more than one build rule found between the given document and part, "
+			    + size);
 		}
-	    } 
+	    }
 	    return (EPMBuildRule) rules.nextElement ();
 	}
     }
@@ -1409,10 +1587,10 @@ public class CADHelper implements RemoteAccess {
 
 	return PersistenceHelper.manager.find (qs);
     }
-    
+
     /**
-     *   Create a WTPartUsageLink between two WTParts, and log the
-     *   creation to the console.
+     * Create a WTPartUsageLink between two WTParts, and log the creation to the
+     * console.
      */
     public static WTPartUsageLink createUsageLink(WTPart parent, WTPart child, double amount) throws WTException {
 	if (logger.isDebugEnabled ()) {
@@ -1425,17 +1603,18 @@ public class CADHelper implements RemoteAccess {
 	link = (WTPartUsageLink) PersistenceHelper.manager.save (link);
 	return link;
     }
-    
+
     public static List<WTPartUsageLink> getUsageLinks(WTPart part) throws WTException {
 	List<WTPartUsageLink> usageLinks = new ArrayList<WTPartUsageLink> ();
-	QueryResult qr = StructHelper.service.navigateUses (part,WTPartUsageLink.class, false/* onlyOtherSide */);
+	QueryResult qr = StructHelper.service.navigateUses (part,WTPartUsageLink.class,
+		false/* onlyOtherSide */);
 	while (qr.hasMoreElements () == true) {
 	    WTPartUsageLink usageLink = (WTPartUsageLink) qr.nextElement ();
 	    usageLinks.add (usageLink);
 	}
 	return usageLinks;
     }
-    
+
     public static WTPartUsageLink getWTPartUsageLink(WTPart parentPart, WTPartMaster childPartMaster)
 	    throws WTException {
 	if (parentPart == null || childPartMaster == null) {
@@ -1457,7 +1636,8 @@ public class CADHelper implements RemoteAccess {
 	    }
 	}
 
-	// Return the first found part master (suppose to have only for each number)
+	// Return the first found part master (suppose to have only for each
+	// number)
 	if (partUsageLink != null) {
 	    return partUsageLink;
 	}
@@ -1466,23 +1646,57 @@ public class CADHelper implements RemoteAccess {
 	}
 	return null;
     }
-    
-    public static PartCategory getPartCategory (Document document) {
+
+    public static PartCategory getPartCategory(Document document) throws WTException {
 	CadDocument cadDocument = (CadDocument) document.getObject ();
 	return getPartCategory (cadDocument);
     }
-    
-    public static PartCategory getPartCategory (CadDocument cadDocument) {
-	String number = cadDocument.getNumber ();
-	String type = cadDocument.getSource ();
-	if (!StringUtils.isEmpty (number)) {
-	    if (StringUtils.contains (type,"外购件")) {
-		return PartCategory.BUY;
-	    } else if (StringUtils.isEmpty (type) || StringUtils.contains (type,"自制件")) {
-		return PartCategory.MAKE;  
+
+    public static PartCategory getPartCategory(CadDocument cadDocument) throws WTException {
+	String material = cadDocument.getMaterial ();// 标题栏中的外购件图号
+	String type = cadDocument.getSource ();// 零部件类型
+	// 当零部件类型为"外购件"且标题栏中外购件图号不为空时为外购件
+	if (StringUtils.equals (type,"外购件") && !StringUtils.isEmpty (material)) {
+	    return PartCategory.BUY;
+	} // 零部件类型不存在或等于自制件且标题栏没有外购件图号为自制件
+	else if (( StringUtils.isEmpty (type) || StringUtils.contains (type,"自制件") )
+		&& StringUtils.isEmpty (material)) {
+	    return PartCategory.MAKE;
+	} else {
+	    throw new WTException ("图纸[" + cadDocument.getNumber () + "]即不是外购件也不是自制件.");
+	}
+    }
+
+    public static PartCategory getPartCategory(WTPart wtpart) throws WTException {
+	String objectType;
+	try {
+	    objectType = ClientTypedUtility.getExternalTypeIdentifier (wtpart);
+	}
+	catch(RemoteException e) {
+	    e.printStackTrace ();
+	    throw new WTException (e.getLocalizedMessage ());
+	}
+	if (StringUtils.equals (objectType,PART_MAKE)) {
+	    return PartCategory.MAKE;
+	} else if (StringUtils.equals (objectType,PART_BUY)) {
+	    return PartCategory.BUY;
+	}
+	return null;
+    }
+
+    public static List<EPMDocument> get2Drawing(WTPart part) throws WTException {
+	List<EPMDocument> list = new ArrayList<EPMDocument> ();
+	QueryResult qr = PartDocServiceCommand.getAssociatedCADDocuments (part);
+	while (qr.hasMoreElements ()) {
+	    EPMDocument epm = (EPMDocument) qr.nextElement ();
+	    String cadName = epm.getCADName ();
+	    if (cadName.toLowerCase ().endsWith (".drw") || cadName.toLowerCase ().endsWith (".dwg")) {
+		if (!list.contains (epm)) {
+		    list.add (epm);
+		}
 	    }
 	}
-	return null;  
+	return list;
     }
-    
+
 }
