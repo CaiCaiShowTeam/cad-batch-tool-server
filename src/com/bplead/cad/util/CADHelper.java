@@ -111,9 +111,9 @@ public class CADHelper implements RemoteAccess {
 
     public static EPMDocumentType componentType = EPMDocumentType.toEPMDocumentType ("CADCOMPONENT");
 
-    private static final String PART_MAKE = "";
+    private static final String PART_MAKE = "WCTYPE|wt.part.WTPart|com.sjzgx.PurchasedPart";
 
-    private static final String PART_BUY = "";
+    private static final String PART_BUY = "WCTYPE|wt.part.WTPart|com.sjzgx.SelfMadePart";
 
     private static final String WC_TYPE_PREFIX = "WCTYPE|";
 
@@ -347,8 +347,22 @@ public class CADHelper implements RemoteAccess {
 		break;
 	    }
 	}
-
-	EPMDocument epmDoc = EPMDocument.newEPMDocument (cadDoc.getNumber (),cadDoc.getName (),authorAutoCAD,
+	//处理多页图编号问题
+	String epmNumber = cadDoc.getNumber ();
+	Integer pageSize = StringUtils.isEmpty (cadDoc.getPageSize ()) ? 1 : Integer.valueOf (cadDoc.getPageSize ());
+	Integer pageIndex = StringUtils.isEmpty (cadDoc.getPageIndex ()) ? 1 : Integer.valueOf (cadDoc.getPageIndex ());
+	//如果总页数大于1说明时多页图
+	if (pageSize > 1) {
+	    //如果当前面大于1,则编号末尾增加pageIndex-1
+	    if (pageIndex > 1) {
+		epmNumber = epmNumber + (pageIndex - 1);
+	    }
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("多页图处理后的编号 epmNumber is -> " + epmNumber);
+	    }
+	}
+	
+	EPMDocument epmDoc = EPMDocument.newEPMDocument (epmNumber,cadDoc.getName (),authorAutoCAD,
 		componentType,cadName);
 	// If the folder is null, put the document in the container's default
 	// cabinet.
@@ -1693,6 +1707,10 @@ public class CADHelper implements RemoteAccess {
 	    EPMDocument epm = (EPMDocument) qr.nextElement ();
 	    String cadName = epm.getCADName ();
 	    if (cadName.toLowerCase ().endsWith (".drw") || cadName.toLowerCase ().endsWith (".dwg")) {
+		//此处还要排除与部件同编号的对象
+		if (StringUtils.equalsIgnoreCase (epm.getNumber (),part.getNumber ())) {
+		    continue;
+		}
 		if (!list.contains (epm)) {
 		    list.add (epm);
 		}
