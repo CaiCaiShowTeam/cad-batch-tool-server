@@ -355,7 +355,7 @@ public class CADHelper implements RemoteAccess {
 	if (pageSize > 1) {
 	    //如果当前面大于1,则编号末尾增加pageIndex-1
 	    if (pageIndex > 1) {
-		epmNumber = epmNumber + (pageIndex - 1);
+		epmNumber = epmNumber + "-" + (pageIndex - 1);
 	    }
 	    if (logger.isDebugEnabled ()) {
 		logger.debug ("多页图处理后的编号 epmNumber is -> " + epmNumber);
