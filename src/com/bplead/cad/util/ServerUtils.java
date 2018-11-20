@@ -138,6 +138,45 @@ public class ServerUtils implements RemoteAccess, Serializable {
 	    container.setFolder (folder);
 	}
     }
+    
+    public static HandleResult<String> validateComfirm(Documents documents) throws WTException {
+	StringBuffer buf = new StringBuffer ();
+	List<Integer> checkRows = documents.getCheckRows ();
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("checkin checkRows is -> " + checkRows);
+	}
+	List<Document> docList = documents.getDocuments ();
+	for (int i = 0; i < docList.size (); i++) {
+	    if (!checkRows.contains (i)) {
+		continue;
+	    }
+	    Document document = docList.get (i);
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("current processor order is ->  " + ( i + 1 ));
+	    }
+
+	    CadStatus cadStatus = document.getCadStatus ();
+	    String epmNumber = "";
+	    if (cadStatus == CadStatus.NOT_EXIST) {
+		CadDocument cadDocument = (CadDocument) document.getObject ();
+		epmNumber = cadDocument.getNumber ();
+	    } else {
+		epmNumber = document.getNumber ();
+	    }
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("getAssociatePart epmNumber is -> " + epmNumber);
+	    }
+	    WTPart part = CADHelper.getLatestWTPart (epmNumber,"Design",null);
+	    // 如果部件已存在,检查是否关联drw或者其他autoCAD文档
+	    if (part != null) {
+		List<EPMDocument> list = CADHelper.get2Drawing (part);
+		if (list != null && !list.isEmpty ()) {
+		    buf.append("图纸代号为[" + epmNumber + "]的部件在系统中已关联drw文件或者其他AutoCAD图纸.");
+		}
+	    }
+	}
+	return HandleResult.toSuccessedResult (buf.toString ());
+    }
 
     public static HandleResult<Boolean> checkin(Documents documents) {
 	HandleResult<Boolean> result = null;

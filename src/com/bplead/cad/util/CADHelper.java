@@ -71,6 +71,7 @@ import wt.lifecycle.State;
 import wt.log4j.LogR;
 import wt.method.RemoteAccess;
 import wt.part.Quantity;
+import wt.part.QuantityUnit;
 import wt.part.WTPart;
 import wt.part.WTPartMaster;
 import wt.part.WTPartStandardConfigSpec;
@@ -144,8 +145,7 @@ public class CADHelper implements RemoteAccess {
 	    refreshMe = ( (IBAHolder) object ).getAttributeContainer () != null;
 	}
 	object = WorkInProgressHelper.service.checkin (object,note);
-	// AttributeContainers are stripped off by checkin, so they must be
-	// refreshed
+	// AttributeContainers are stripped off by checkin, so they must be refreshed
 	if (refreshMe) {
 	    object = (Workable) readValues ((IBAHolder) object,null);
 	}
@@ -946,12 +946,12 @@ public class CADHelper implements RemoteAccess {
 	}
 
 	// 如果部件已存在,检查是否关联drw或者其他autoCAD文档
-	if (exist) {
-	    List<EPMDocument> list = get2Drawing (part);
-	    if (list != null && !list.isEmpty ()) {
-		throw new WTException ("图纸代号为[" + part.getNumber () + "]的部件在系统中已关联drw文件或者其他AutoCAD图纸.");
-	    }
-	}
+//	if (exist) {
+//	    List<EPMDocument> list = get2Drawing (part);
+//	    if (list != null && !list.isEmpty ()) {
+//		throw new WTException ("图纸代号为[" + part.getNumber () + "]的部件在系统中已关联drw文件或者其他AutoCAD图纸.");
+//	    }
+//	}
 
 	// First, check out the part if epmdocument is checkout state.
 	if (WorkInProgressHelper.isCheckedOut (epm)) {
@@ -1101,12 +1101,12 @@ public class CADHelper implements RemoteAccess {
 	Assert.notNull (part,"releated part is null");
 
 	// 如果部件已存在,检查是否关联drw或者其他autoCAD文档
-	if (exist) {
-	    List<EPMDocument> list = get2Drawing (part);
-	    if (list != null && !list.isEmpty ()) {
-		throw new WTException ("图纸代号为[" + part.getNumber () + "]的部件在系统中已关联drw文件或者其他AutoCAD图纸.");
-	    }
-	}
+//	if (exist) {
+//	    List<EPMDocument> list = get2Drawing (part);
+//	    if (list != null && !list.isEmpty ()) {
+//		throw new WTException ("图纸代号为[" + part.getNumber () + "]的部件在系统中已关联drw文件或者其他AutoCAD图纸.");
+//	    }
+//	}
 
 	if (logger.isDebugEnabled ()) {
 	    logger.debug ("下面要针对部件 " + PrintHelper.printIterated (part) + " 与EPMDocuments " + epmList + " 建立关联关系");
@@ -1598,7 +1598,9 @@ public class CADHelper implements RemoteAccess {
 	}
 	WTPartUsageLink link = WTPartUsageLink.newWTPartUsageLink (parent,(WTPartMaster) child.getMaster ());
 	Quantity qty = Quantity.newQuantity ();
+	QuantityUnit qu = child.getDefaultUnit ();
 	qty.setAmount (amount);
+	qty.setUnit (qu);
 	link.setQuantity (qty);
 	link = (WTPartUsageLink) PersistenceHelper.manager.save (link);
 	return link;
