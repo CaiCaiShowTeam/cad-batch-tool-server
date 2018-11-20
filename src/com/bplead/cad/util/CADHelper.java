@@ -111,9 +111,9 @@ public class CADHelper implements RemoteAccess {
 
     public static EPMDocumentType componentType = EPMDocumentType.toEPMDocumentType ("CADCOMPONENT");
 
-    private static final String PART_MAKE = "WCTYPE|wt.part.WTPart|com.sjzgx.PurchasedPart";
+    private static final String PART_MAKE = "WCTYPE|wt.part.WTPart|com.sjzgx.SelfMadePart";
 
-    private static final String PART_BUY = "WCTYPE|wt.part.WTPart|com.sjzgx.SelfMadePart";
+    private static final String PART_BUY = "WCTYPE|wt.part.WTPart|com.sjzgx.PurchasedPart";
 
     private static final String WC_TYPE_PREFIX = "WCTYPE|";
 
