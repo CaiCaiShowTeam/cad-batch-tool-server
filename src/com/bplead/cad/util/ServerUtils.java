@@ -8,12 +8,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
-
 import org.apache.log4j.Logger;
-
 import com.bplead.cad.bean.BOMInfo;
 import com.bplead.cad.bean.DataContent;
-import com.bplead.cad.bean.PDMInfo;
 import com.bplead.cad.bean.SimpleDocument;
 import com.bplead.cad.bean.SimpleFolder;
 import com.bplead.cad.bean.SimplePdmLinkProduct;
@@ -25,7 +22,6 @@ import com.bplead.cad.bean.io.Container;
 import com.bplead.cad.bean.io.Document;
 import com.bplead.cad.bean.io.Documents;
 import com.ptc.windchill.uwgm.common.util.PrintHelper;
-
 import priv.lee.cad.bean.HandleResult;
 import priv.lee.cad.util.Assert;
 import priv.lee.cad.util.StringUtils;
@@ -602,10 +598,10 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		return result;
 	}
 
-	public static HandleResult<List<PDMInfo>> getPDMInfos() {
-		HandleResult<List<PDMInfo>> result = null;
+	public static HandleResult<List<SimplePdmLinkProduct>> getPDMInfos() {
+		HandleResult<List<SimplePdmLinkProduct>> result = null;
 		try {
-			List<PDMInfo> infos = new ArrayList<PDMInfo>();
+			List<SimplePdmLinkProduct> infos = new ArrayList<SimplePdmLinkProduct>();
 			WTPrincipal localWTPrincipal = SessionHelper.manager.getPrincipal();
 			ContainerSpec cs = new ContainerSpec(PDMLinkProduct.class);
 			cs.setUser(WTPrincipalReference.newWTPrincipalReference(localWTPrincipal));
@@ -623,7 +619,8 @@ public class ServerUtils implements RemoteAccess, Serializable {
 				String modifier = user.getFullName() + "(" + user.getName() + ")";
 				String updateDate = CommonUtils.transferTimestampToString(pdm.getModifyTimestamp(), null, null, null);
 
-				PDMInfo info = new PDMInfo();
+				SimplePdmLinkProduct info = new SimplePdmLinkProduct();
+				info.setOid(CommonUtils.getPersistableOid(pdm));
 				info.setName(pdm.getName());
 				info.setModifyTime(updateDate);
 				info.setModifier(modifier);
