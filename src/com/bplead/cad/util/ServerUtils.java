@@ -242,6 +242,9 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		}
 	    }
 	    
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("构建BOM结构开始...");
+	    }
 	    LinkedHashMap<WTPart, List<WTPartUsageLink>> usageLinkMap = new LinkedHashMap<WTPart, List<WTPartUsageLink>> ();
 	    StringBuffer buf = new StringBuffer ();
 	    // build bom TODO after of checkin 
@@ -318,6 +321,9 @@ public class ServerUtils implements RemoteAccess, Serializable {
 	    
 	    if (!StringUtils.isEmpty (buf.toString ())) {
 		throw new WTException (buf.toString ());
+	    }
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("构建BOM结构结束...");
 	    }
 	    
 	    //检入被检出的父部件
