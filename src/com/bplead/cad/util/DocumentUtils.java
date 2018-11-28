@@ -48,8 +48,8 @@ public class DocumentUtils implements RemoteAccess {
 	public static final String INSTANCE_NUM_SEPERATOR = ",";
 	private static final String LIKE = "%";
 	private static final Logger logger = Logger.getLogger(DocumentUtils.class);
-	private static final String NAME = "NAME";
-	private static final String NUMBER = "DOCUMENTNUMBER";
+	private static final String NAME = "name";
+	private static final String NUMBER = "documentNumber";
 	private static final String ZIP = ".zip";
 
 	public static DataContent checkoutAndDownload4Zip(List<SimpleDocument> documents) throws Exception {
