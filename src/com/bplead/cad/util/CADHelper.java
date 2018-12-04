@@ -1669,7 +1669,7 @@ public class CADHelper implements RemoteAccess {
     }
 
     public static PartCategory getPartCategory(CadDocument cadDocument) throws WTException {
-	String material = cadDocument.getMaterial ();// 标题栏中的外购件图号
+	String material = cadDocument.getBuyNum ();// 标题栏中的外购件图号
 	String type = cadDocument.getSource ();// 零部件类型
 	// 当零部件类型为"外购件"且标题栏中外购件图号不为空时为外购件
 	if (StringUtils.equals (type,"外购件") && !StringUtils.isEmpty (material)) {
