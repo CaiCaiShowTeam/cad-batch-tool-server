@@ -226,8 +226,12 @@ public class DocumentUtils implements RemoteAccess {
 			if (!roleRepo.exists()) {
 				roleRepo.mkdirs();
 			}
-
-			String appRepo = roleRepo.getPath() + File.separator + application.getFileName();
+			String appRepo = "";
+			if (StringUtils.equalsIgnoreCase("{$CAD_NAME}", application.getFileName())) {
+				appRepo = roleRepo.getPath() + File.separator + epmdocument.getCADName();
+			} else {
+				appRepo = roleRepo.getPath() + File.separator + application.getFileName();
+			}
 			logger.info("EPMDocument[" + CommonUtils.getPersistableOid(epmdocument) + "],role[" + application.getRole()
 					+ "],repository[" + appRepo + "]");
 			ContentServerHelper.service.writeContentStream(application, appRepo);

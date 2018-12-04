@@ -264,21 +264,28 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		String parentNumber = cadDocument.getNumber ();
 		WTPart parentPart = CADHelper.getLatestWTPart (parentNumber,"Design",null);
 		if (parentPart == null) {
-		    buf.append ("编号为[" + parentNumber + "]的部件在系统中不存在,不能为其创建BOM.");
+		    buf.append ("编号为[" + parentNumber + "]的部件在系统中不存在,不能为其创建BOM.\n");
 		    continue;
 		}
+		if (logger.isDebugEnabled()) {
+			logger.debug("parentPart is -> " + parentPart.getDisplayIdentifier() + " isCheckout is -> " + WorkInProgressHelper.isCheckedOut (parentPart));
+		}
+		WTPart copyPart = parentPart;
 		for (CADLink link : links) {
 		    String childNumber = link.getNumber ();
 		    WTPart childPart = CADHelper.getLatestWTPart (childNumber,"Design",null);
 		    if (childPart == null) {
-			 buf.append ("编号为[" + childNumber + "]的部件在系统中不存在,不能添加为BOM部件.");
+			 buf.append ("编号为[" + childNumber + "]的部件在系统中不存在,不能添加为BOM部件.\n");
 			 continue;
 		    }
-		    WTPart copyPart = null;
-		    if (!WorkInProgressHelper.isCheckedOut (parentPart)) {
-			copyPart = (WTPart) CADHelper.checkout (parentPart,"cad tool build bom.");
-		    } else if (!WorkInProgressHelper.isWorkingCopy (parentPart)) {
-			copyPart = (WTPart) WorkInProgressHelper.service.workingCopyOf (parentPart);
+		    
+		    if (logger.isDebugEnabled()) {
+				logger.debug("copyPart is -> " + copyPart.getDisplayIdentifier() + " isCheckout is -> " + WorkInProgressHelper.isCheckedOut (copyPart));
+			}
+		    if (!WorkInProgressHelper.isCheckedOut (copyPart)) {
+			copyPart = (WTPart) CADHelper.checkout (copyPart,"cad tool build bom.");
+		    } else if (!WorkInProgressHelper.isWorkingCopy (copyPart)) {
+			copyPart = (WTPart) WorkInProgressHelper.service.workingCopyOf (copyPart);
 		    }
 		    //找到父部件与子部件的usageLink
 		    WTPartUsageLink oldLink = CADHelper.getWTPartUsageLink (copyPart,(WTPartMaster) childPart.getMaster ());

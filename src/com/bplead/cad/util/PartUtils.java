@@ -312,7 +312,7 @@ public class PartUtils implements RemoteAccess {
 	@SuppressWarnings("rawtypes")
 	public static BOMInfo getBomDetail(String partNumber) throws WTException {
 		BOMInfo bomInfo = new BOMInfo();
-		WTPart part = getWTPart(partNumber);
+		WTPart part = CADHelper.getLatestWTPart(partNumber, "Design", null);
 		if (part == null) {
 			return bomInfo;
 		}
@@ -327,7 +327,7 @@ public class PartUtils implements RemoteAccess {
 			String childNumber = childMaster.getNumber();
 			String childName = childMaster.getName();
 			double partAmout = link.getQuantity().getAmount();
-			WTPart child = getWTPart(childNumber);
+			WTPart child = CADHelper.getLatestWTPart(childNumber, "Design", null);
 			IBAUtils childUtils = new IBAUtils((IBAHolder) child);
 			String childSpecifiction = childUtils.getIBAValue(MATERIALMODEL);
 			String childWeight = childUtils.getIBAValue(SIGLETONWEIGHT);
