@@ -118,6 +118,9 @@ public class CADHelper implements RemoteAccess {
     private static final String WC_TYPE_PREFIX = "WCTYPE|";
 
     private static final String DEFAULT_FOLDER = "/Default";
+    
+    public static final String SUFFIX_DWG = ".DWG";
+    
     private static Logger logger = LogR.getLogger (CADHelper.class.getName ());
 
     public static SimpleFolder buildSimpleFolder(Foldered foldered) throws WTException {
@@ -145,7 +148,8 @@ public class CADHelper implements RemoteAccess {
 	    refreshMe = ( (IBAHolder) object ).getAttributeContainer () != null;
 	}
 	object = WorkInProgressHelper.service.checkin (object,note);
-	// AttributeContainers are stripped off by checkin, so they must be refreshed
+	// AttributeContainers are stripped off by checkin, so they must be
+	// refreshed
 	if (refreshMe) {
 	    object = (Workable) readValues ((IBAHolder) object,null);
 	}
@@ -347,23 +351,23 @@ public class CADHelper implements RemoteAccess {
 		break;
 	    }
 	}
-	//处理多页图编号问题
+	// 处理多页图编号问题
 	String epmNumber = cadDoc.getNumber ();
 	Integer pageSize = StringUtils.isEmpty (cadDoc.getPageSize ()) ? 1 : Integer.valueOf (cadDoc.getPageSize ());
 	Integer pageIndex = StringUtils.isEmpty (cadDoc.getPageIndex ()) ? 1 : Integer.valueOf (cadDoc.getPageIndex ());
-	//如果总页数大于1说明时多页图
+	// 如果总页数大于1说明时多页图
 	if (pageSize > 1) {
-	    //如果当前面大于1,则编号末尾增加pageIndex-1
+	    // 如果当前面大于1,则编号末尾增加pageIndex-1
 	    if (pageIndex > 1) {
-		epmNumber = epmNumber + "-" + (pageIndex - 1);
+		epmNumber = epmNumber + "-" + ( pageIndex - 1 );
 	    }
 	    if (logger.isDebugEnabled ()) {
 		logger.debug ("多页图处理后的编号 epmNumber is -> " + epmNumber);
 	    }
 	}
-	
-	EPMDocument epmDoc = EPMDocument.newEPMDocument (epmNumber,cadDoc.getName (),authorAutoCAD,
-		componentType,cadName);
+
+	EPMDocument epmDoc = EPMDocument.newEPMDocument (addSuffix (epmNumber,null,true),cadDoc.getName (),authorAutoCAD,componentType,
+		cadName);
 	// If the folder is null, put the document in the container's default
 	// cabinet.
 	if (folder == null && wtcontainer != null) {
@@ -427,7 +431,9 @@ public class CADHelper implements RemoteAccess {
 	    logger.debug ("createPart wtcontainer is -> " + PrintHelper.printContainer (wtcontainer) + " folder is -> "
 		    + PrintHelper.printFolder (folder));
 	}
-	WTPart part = WTPart.newWTPart (cadDoc.getNumber (),cadDoc.getName ());
+	String number = cadDoc.getNumber ();
+	number = removeSuffix (number,null,true);
+	WTPart part = WTPart.newWTPart (number,cadDoc.getName ());
 
 	TypeDefinitionReference tdr = TypedUtility
 		.getTypeDefinitionReference (StringUtils.substringAfter (PART_MAKE,WC_TYPE_PREFIX));
@@ -562,7 +568,7 @@ public class CADHelper implements RemoteAccess {
 	WTPartStandardConfigSpec configSpec = WTPartStandardConfigSpec.newWTPartStandardConfigSpec (
 		view == null || view.equals ("") ? null : ViewHelper.service.getView (view),
 		state == null || state.equals ("") ? null : State.toState (state));
-	return WTPartUtilities.getWTPart (partNumber,configSpec);
+	return WTPartUtilities.getWTPart (partNumber.toUpperCase (),configSpec);
     }
 
     public static EPMDocument getDocumentByCadName(String name) throws WTException {
@@ -621,7 +627,7 @@ public class CADHelper implements RemoteAccess {
 
 	QuerySpec querySpec = new QuerySpec (EPMDocument.class);
 	int [] fromIndicies = { 0, -1 };
-	querySpec.appendWhere (new SearchCondition (EPMDocument.class,EPMDocument.NUMBER,SearchCondition.EQUAL,number),
+	querySpec.appendWhere (new SearchCondition (EPMDocument.class,EPMDocument.NUMBER,SearchCondition.EQUAL,number.toUpperCase ()),
 		fromIndicies);
 	querySpec = configSpec.appendSearchCriteria (querySpec);
 
@@ -943,12 +949,12 @@ public class CADHelper implements RemoteAccess {
 		logger.info ("获取epm文档关联部件结束... " + PrintHelper.printIterated (part) + " staus isCheckedOut is -> "
 			+ WorkInProgressHelper.isCheckedOut (part) + " exist is -> " + exist);
 	    }
-		logger.info("处理epm文档关联部件IBA属性开始... ");
-		// process iba attribute
-		part = processIBAHolder(part, (CadDocument) document.getObject(), WTPart.class);
-		if (logger.isInfoEnabled()) {
-			logger.info("处理epm文档关联部件IBA属性结束... ");
-		}
+	    logger.info ("处理epm文档关联部件IBA属性开始... ");
+	    // process iba attribute
+	    part = processIBAHolder (part,(CadDocument) document.getObject (),WTPart.class);
+	    if (logger.isInfoEnabled ()) {
+		logger.info ("处理epm文档关联部件IBA属性结束... ");
+	    }
 	    Assert.notNull (part,"releated part is null");
 	}
 
@@ -959,12 +965,13 @@ public class CADHelper implements RemoteAccess {
 	}
 
 	// 如果部件已存在,检查是否关联drw或者其他autoCAD文档
-//	if (exist) {
-//	    List<EPMDocument> list = get2Drawing (part);
-//	    if (list != null && !list.isEmpty ()) {
-//		throw new WTException ("图纸代号为[" + part.getNumber () + "]的部件在系统中已关联drw文件或者其他AutoCAD图纸.");
-//	    }
-//	}
+	// if (exist) {
+	// List<EPMDocument> list = get2Drawing (part);
+	// if (list != null && !list.isEmpty ()) {
+	// throw new WTException ("图纸代号为[" + part.getNumber () +
+	// "]的部件在系统中已关联drw文件或者其他AutoCAD图纸.");
+	// }
+	// }
 
 	// First, check out the part if epmdocument is checkout state.
 	if (WorkInProgressHelper.isCheckedOut (epm)) {
@@ -1081,6 +1088,7 @@ public class CADHelper implements RemoteAccess {
 	if (logger.isDebugEnabled ()) {
 	    logger.debug ("find_associated_part_classname is -> " + classConfig);
 	}
+	partNumber = removeSuffix (partNumber,null,true);
 	if (StringUtils.isEmpty (classConfig)) {
 	    DefaultFindAssociatePart find = new DefaultFindAssociatePart ();
 	    Object [] findResult = find.getAssociatePart (partNumber,document0);
@@ -1104,22 +1112,22 @@ public class CADHelper implements RemoteAccess {
 	    logger.info ("获取epm文档关联部件结束... " + PrintHelper.printIterated (part) + " staus isCheckedOut is -> "
 		    + WorkInProgressHelper.isCheckedOut (part) + " exist is -> " + exist);
 	}
-	// logger.info ("处理epm文档关联部件IBA属性开始... ");
-	// // process iba attribute
-	// part = processIBAHolder (part,(CadDocument) document.getObject
-	// (),WTPart.class);
-	// if (logger.isInfoEnabled ()) {
-	// logger.info ("处理epm文档关联部件IBA属性结束... ");
-	// }
+	logger.info ("处理epm文档关联部件IBA属性开始... ");
+	// process iba attribute
+	part = processIBAHolder (part,(CadDocument) document0.getObject (),WTPart.class);
+	if (logger.isInfoEnabled ()) {
+	    logger.info ("处理epm文档关联部件IBA属性结束... ");
+	}
 	Assert.notNull (part,"releated part is null");
 
 	// 如果部件已存在,检查是否关联drw或者其他autoCAD文档
-//	if (exist) {
-//	    List<EPMDocument> list = get2Drawing (part);
-//	    if (list != null && !list.isEmpty ()) {
-//		throw new WTException ("图纸代号为[" + part.getNumber () + "]的部件在系统中已关联drw文件或者其他AutoCAD图纸.");
-//	    }
-//	}
+	// if (exist) {
+	// List<EPMDocument> list = get2Drawing (part);
+	// if (list != null && !list.isEmpty ()) {
+	// throw new WTException ("图纸代号为[" + part.getNumber () +
+	// "]的部件在系统中已关联drw文件或者其他AutoCAD图纸.");
+	// }
+	// }
 
 	if (logger.isDebugEnabled ()) {
 	    logger.debug ("下面要针对部件 " + PrintHelper.printIterated (part) + " 与EPMDocuments " + epmList + " 建立关联关系");
@@ -1706,7 +1714,7 @@ public class CADHelper implements RemoteAccess {
 	    EPMDocument epm = (EPMDocument) qr.nextElement ();
 	    String cadName = epm.getCADName ();
 	    if (cadName.toLowerCase ().endsWith (".drw") || cadName.toLowerCase ().endsWith (".dwg")) {
-		//此处还要排除与部件同编号的对象
+		// 此处还要排除与部件同编号的对象
 		if (StringUtils.equalsIgnoreCase (epm.getNumber (),part.getNumber ())) {
 		    continue;
 		}
@@ -1717,5 +1725,36 @@ public class CADHelper implements RemoteAccess {
 	}
 	return list;
     }
-
+    
+    public static String addSuffix (String number,String suffix,Boolean toUpper) {
+	String retStr = "";
+	if (StringUtils.isEmpty (number)) {
+	    return retStr;
+	}
+	if (toUpper) {
+	    number = number.toUpperCase ();
+	}
+	if (StringUtils.isEmpty (suffix)) {
+	    retStr = number + SUFFIX_DWG;
+	} else {
+	    retStr = number + suffix;
+	}
+	return retStr;
+    }
+    
+    public static String removeSuffix (String number,String suffix,Boolean toUpper) {
+	String retStr = "";
+	if (StringUtils.isEmpty (number)) {
+	    return retStr;
+	}
+	if (toUpper) {
+	    number = number.toUpperCase ();
+	}
+	if (StringUtils.isEmpty (suffix)) {
+	    retStr = StringUtils.substringBeforeLast (number,SUFFIX_DWG);
+	} else {
+	    retStr = StringUtils.substringBeforeLast (number,suffix);
+	}
+	return retStr;
+    }
 }

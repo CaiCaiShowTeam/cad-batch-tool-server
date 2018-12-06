@@ -38,6 +38,7 @@ public class DefaultFindAssociatePart implements FindAssociatePart {
 	} else {
 	    epmNumber = document.getNumber ();
 	}
+	epmNumber = CADHelper.removeSuffix (epmNumber,null,true);
 	if (logger.isDebugEnabled ()) {
 	    logger.debug ("getAssociatePart epmNumber is -> " + epmNumber);
 	}
