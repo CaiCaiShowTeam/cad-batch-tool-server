@@ -81,7 +81,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		Document document = new Document ();
 		document.setObject (cadDocument);
 		String number = cadDocument.getNumber ();
-		EPMDocument epm = CADHelper.getDocumentByNumber (number);
+		EPMDocument epm = CADHelper.getDocumentByNumber (number != null ? number.toUpperCase() : "");
 		if (epm == null) {
 		    if (logger.isDebugEnabled ()) {
 			logger.debug ("图纸编号[" + number + "]的对象在系统中不存在.");

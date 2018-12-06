@@ -943,13 +943,12 @@ public class CADHelper implements RemoteAccess {
 		logger.info ("获取epm文档关联部件结束... " + PrintHelper.printIterated (part) + " staus isCheckedOut is -> "
 			+ WorkInProgressHelper.isCheckedOut (part) + " exist is -> " + exist);
 	    }
-	    // logger.info ("处理epm文档关联部件IBA属性开始... ");
-	    // // process iba attribute
-	    // part = processIBAHolder (part,(CadDocument) document.getObject
-	    // (),WTPart.class);
-	    // if (logger.isInfoEnabled ()) {
-	    // logger.info ("处理epm文档关联部件IBA属性结束... ");
-	    // }
+		logger.info("处理epm文档关联部件IBA属性开始... ");
+		// process iba attribute
+		part = processIBAHolder(part, (CadDocument) document.getObject(), WTPart.class);
+		if (logger.isInfoEnabled()) {
+			logger.info("处理epm文档关联部件IBA属性结束... ");
+		}
 	    Assert.notNull (part,"releated part is null");
 	}
 
