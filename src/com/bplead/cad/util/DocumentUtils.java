@@ -147,7 +147,7 @@ public class DocumentUtils implements RemoteAccess {
 		simpleDoc.setVersion(
 				document.getVersionIdentifier().getValue() + "." + document.getIterationIdentifier().getValue());
 		simpleDoc.setModifyTime(CommonUtils.transferTimestampToString(document.getModifyTimestamp(), null, null, null));
-		simpleDoc.setNumber(document.getCreatorFullName() + "(" + document.getCreatorName() + ")");
+		simpleDoc.setCreator(document.getCreatorFullName() + "(" + document.getCreatorName() + ")");
 		return simpleDoc;
 	}
 
