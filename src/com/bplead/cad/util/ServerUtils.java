@@ -161,6 +161,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 	    } else {
 		epmNumber = document.getNumber ();
 	    }
+	    epmNumber = CADHelper.removeSuffix (epmNumber,null,true);
 	    if (logger.isDebugEnabled ()) {
 		logger.debug ("getAssociatePart epmNumber is -> " + epmNumber);
 	    }
