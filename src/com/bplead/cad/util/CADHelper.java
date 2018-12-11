@@ -352,20 +352,30 @@ public class CADHelper implements RemoteAccess {
 	    }
 	}
 	// 处理多页图编号问题
-	String epmNumber = cadDoc.getNumber ();
+	String epmNumber = "";
+	PartCategory category = getPartCategory (cadDoc);
+	//如果是自制件,EPMDocument编号以图纸代码即number字段为编号
+	if (category == PartCategory.MAKE) {
+	    epmNumber = cadDoc.getNumber ();
+	} //如果是外购件,EPMDocument编号以外购件图号即buyNum字段为编号
+	else if (category == PartCategory.BUY) {
+	    epmNumber = cadDoc.getBuyNum ();
+	}
 	Integer pageSize = StringUtils.isEmpty (cadDoc.getPageSize ()) ? 1 : Integer.valueOf (cadDoc.getPageSize ());
 	Integer pageIndex = StringUtils.isEmpty (cadDoc.getPageIndex ()) ? 1 : Integer.valueOf (cadDoc.getPageIndex ());
-	// 如果总页数大于1说明时多页图
+	// 如果总页数大于1说明是多页图
 	if (pageSize > 1) {
-	    // 如果当前面大于1,则编号末尾增加pageIndex-1
+	    // 如果当前页大于1,则以实体文件名即XXX.DWG作为EPMDocument编号
 	    if (pageIndex > 1) {
-		epmNumber = epmNumber + "-" + ( pageIndex - 1 );
-	    }
-	    if (logger.isDebugEnabled ()) {
-		logger.debug ("多页图处理后的编号 epmNumber is -> " + epmNumber);
+		epmNumber = getCadName (cadDoc);
+		if (logger.isDebugEnabled ()) {
+		    logger.debug ("多页图处理后的编号 epmNumber is -> " + epmNumber);
+		}
 	    }
 	}
-
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("创建EPMDocument epmNumber is -> " + epmNumber);
+	}
 	EPMDocument epmDoc = EPMDocument.newEPMDocument (addSuffix (epmNumber,null,true),cadDoc.getName (),authorAutoCAD,componentType,
 		cadName);
 	// If the folder is null, put the document in the container's default
@@ -1172,9 +1182,9 @@ public class CADHelper implements RemoteAccess {
 	// Check in the part if we checked it out in order to create the build
 	// rule.
 	if (list != null && !list.isEmpty ()) {
-	    Workable [] copyWorkables = new Workable [] {};
+	    Workable [] copyWorkables = new Workable [list.size ()];
 	    for (int i = 0; i < list.size (); i++) {
-		copyWorkables[i] = list.get (0);
+		copyWorkables[i] = list.get (i);
 	    }
 	    checkin (copyWorkables,"cad tool update epmdocument.");
 	}
@@ -1735,9 +1745,17 @@ public class CADHelper implements RemoteAccess {
 	    number = number.toUpperCase ();
 	}
 	if (StringUtils.isEmpty (suffix)) {
-	    retStr = number + SUFFIX_DWG;
+	    if (!number.endsWith (SUFFIX_DWG)) {
+		retStr = number + SUFFIX_DWG;
+	    } else {
+		retStr = number;
+	    }
 	} else {
-	    retStr = number + suffix;
+	    if (!number.endsWith (suffix)) {
+		retStr = number + suffix;
+	    } else {
+		retStr = number;
+	    }
 	}
 	return retStr;
     }
@@ -1756,5 +1774,24 @@ public class CADHelper implements RemoteAccess {
 	    retStr = StringUtils.substringBeforeLast (number,suffix);
 	}
 	return retStr;
+    }
+    
+    public static String getCadName (Document document) {
+	return getCadName((CadDocument)document.getObject ());
+    }
+    
+    public static String getCadName(CadDocument cadDoc) {
+	// get cadName
+	List<Attachment> attachments = cadDoc.getAttachments ();
+	String cadName = "";
+	for (Attachment attachment : attachments) {
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("getCadName attachment is -> " + attachment);
+	    }
+	    String absolutePath = attachment.getAbsolutePath ();
+	    cadName = StringUtils.substringAfterLast (absolutePath,File.separator);
+	    break;
+	}
+	return cadName;
     }
 }

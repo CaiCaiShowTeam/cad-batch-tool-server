@@ -8,7 +8,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
+
 import org.apache.log4j.Logger;
+
 import com.bplead.cad.bean.BOMInfo;
 import com.bplead.cad.bean.DataContent;
 import com.bplead.cad.bean.SimpleDocument;
@@ -21,7 +23,9 @@ import com.bplead.cad.bean.io.CadStatus;
 import com.bplead.cad.bean.io.Container;
 import com.bplead.cad.bean.io.Document;
 import com.bplead.cad.bean.io.Documents;
+import com.bplead.cad.bean.io.PartCategory;
 import com.ptc.windchill.uwgm.common.util.PrintHelper;
+
 import priv.lee.cad.bean.HandleResult;
 import priv.lee.cad.util.Assert;
 import priv.lee.cad.util.StringUtils;
@@ -80,8 +84,34 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		}
 		Document document = new Document ();
 		document.setObject (cadDocument);
-		String number = cadDocument.getNumber ();
+		
+		String number = "";
+		PartCategory category = CADHelper.getPartCategory (cadDocument);
+		//如果是自制件,EPMDocument编号以图纸代码即number字段为编号
+		if (category == PartCategory.MAKE) {
+		    number = cadDocument.getNumber ();
+		} //如果是外购件,EPMDocument编号以外购件图号即buyNum字段为编号
+		else if (category == PartCategory.BUY) {
+		    number = cadDocument.getBuyNum ();
+		}
 		number = CADHelper.addSuffix (number,null,true);
+		// 处理多页图编号问题
+		Integer pageSize = StringUtils.isEmpty (cadDocument.getPageSize ()) ? 1 : Integer.valueOf (cadDocument.getPageSize ());
+		Integer pageIndex = StringUtils.isEmpty (cadDocument.getPageIndex ()) ? 1 : Integer.valueOf (cadDocument.getPageIndex ());
+		// 如果总页数大于1说明是多页图
+		if (pageSize > 1) {
+		    // 如果当前页大于1,则以实体文件名即XXX.DWG作为EPMDocument编号
+		    if (pageIndex > 1) {
+			number = CADHelper.getCadName (cadDocument);
+			number = number == null ? "" : number.toUpperCase ();
+			if (logger.isDebugEnabled ()) {
+			    logger.debug ("多页图第" + pageIndex + "页处理后的编号 number is -> " + number);
+			}
+		    }
+		}
+		if (logger.isDebugEnabled ()) {
+		    logger.debug ("initialize 搜索EPMDocument的编号为 is -> " + number);
+		}
 		EPMDocument epm = CADHelper.getDocumentByNumber (number);
 		if (epm == null) {
 		    if (logger.isDebugEnabled ()) {
