@@ -5,8 +5,6 @@ package com.bplead.cad.util;
 
 import org.apache.log4j.Logger;
 
-import com.bplead.cad.bean.io.CadDocument;
-import com.bplead.cad.bean.io.CadStatus;
 import com.bplead.cad.bean.io.Document;
 import com.bplead.cad.bean.io.PartCategory;
 
@@ -30,24 +28,16 @@ public class DefaultFindAssociatePart implements FindAssociatePart {
      */
     @Override
     public Object[] getAssociatePart(Document document) throws WTException {
-	CadStatus cadStatus = document.getCadStatus ();
-	String epmNumber = "";
-	if (cadStatus == CadStatus.NOT_EXIST) {
-	    CadDocument cadDocument = (CadDocument) document.getObject ();
-	    epmNumber = cadDocument.getNumber ();
-	} else {
-	    epmNumber = document.getNumber ();
-	}
-	epmNumber = CADHelper.removeSuffix (epmNumber,null,true);
+	String partNumber = CADHelper.getAssociatePartNumber (document);
 	if (logger.isDebugEnabled ()) {
-	    logger.debug ("getAssociatePart epmNumber is -> " + epmNumber);
+	    logger.debug ("getAssociatePart partNumber is -> " + partNumber);
 	}
-	WTPart part = CADHelper.getLatestWTPart (epmNumber,"Design",null); 
+	WTPart part = CADHelper.getLatestWTPart (partNumber,"Design",null); 
 	// if part is null create
 	Boolean exist = false;
 	if (part == null) {
 	    if (logger.isInfoEnabled ()) {
-		logger.info ("系统中没有查询到编号为[" + epmNumber + "]的部件.");
+		logger.info ("系统中没有查询到编号为[" + partNumber + "]的部件.");
 		logger.info ("创建epm文档关联部件开始...");
 	    }
 	    PartCategory category = CADHelper.getPartCategory (document);
@@ -56,7 +46,7 @@ public class DefaultFindAssociatePart implements FindAssociatePart {
 	    }
 	    //如果关联部件不存在并且是外购件,则报错
 	    if (category == PartCategory.BUY) {
-		throw new WTException ("外购件[" + epmNumber + "]在系统中不存在.");
+		throw new WTException ("外购件[" + partNumber + "]在系统中不存在.");
 	    }
 	    part = CADHelper.createPart (document);
 	    if (logger.isInfoEnabled ()) {
@@ -67,7 +57,7 @@ public class DefaultFindAssociatePart implements FindAssociatePart {
 	    PartCategory category1 = CADHelper.getPartCategory (part); 
 	    //如果检入的是外购件,但存在的是自制件则报错
 	    if (category == PartCategory.BUY && category1 == PartCategory.MAKE) {
-		throw new WTException ("系统中存在相同编号的自制件[" + epmNumber + "]");
+		throw new WTException ("系统中存在相同编号的自制件[" + partNumber + "]");
 	    }
 	    exist = true;
 	}

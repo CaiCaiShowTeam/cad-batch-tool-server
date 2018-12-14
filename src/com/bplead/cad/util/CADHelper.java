@@ -366,7 +366,7 @@ public class CADHelper implements RemoteAccess {
 	// 如果总页数大于1说明是多页图
 	if (pageSize > 1) {
 	    // 如果当前页大于1,则以实体文件名即XXX.DWG作为EPMDocument编号
-	    if (pageIndex > 1) {
+	    if (pageIndex > 0) {
 		epmNumber = getCadName (cadDoc);
 		if (logger.isDebugEnabled ()) {
 		    logger.debug ("多页图处理后的编号 epmNumber is -> " + epmNumber);
@@ -1793,5 +1793,36 @@ public class CADHelper implements RemoteAccess {
 	    break;
 	}
 	return cadName;
+    }
+    
+    public static String getAssociatePartNumber (Document document) throws WTException {
+	return getAssociatePartNumber((CadDocument)document.getObject ());
+    }
+    
+    public static String getAssociatePartNumber (CadDocument cadDocument) throws WTException {
+	//无论是自制件还是外购件,图纸关联的部件编号都来自图纸代号即number字段
+	String partNumber = cadDocument.getNumber ();
+	return partNumber == null ? "" : partNumber.toUpperCase ();
+    }
+    
+    public static String buildEPMDocumentNumber (Document document) throws WTException {
+	String epmnumber = document.getNumber ();
+	if (StringUtils.isEmpty (epmnumber)) {
+	    epmnumber = buildEPMDocumentNumber((CadDocument)document.getObject ());
+	}
+	return epmnumber;
+    }
+    
+    public static String buildEPMDocumentNumber (CadDocument cadDocument) throws WTException {
+	String epmnumber = "";
+	PartCategory category = CADHelper.getPartCategory (cadDocument);
+	//如果是自制件,EPMDocument编号以图纸代码即number字段为编号
+	if (category == PartCategory.MAKE) {
+	    epmnumber = cadDocument.getNumber ();
+	} //如果是外购件,EPMDocument编号以外购件图号即buyNum字段为编号
+	else if (category == PartCategory.BUY) {
+	    epmnumber = cadDocument.getBuyNum ();
+	}
+	return CADHelper.addSuffix (epmnumber,null,true);
     }
 }

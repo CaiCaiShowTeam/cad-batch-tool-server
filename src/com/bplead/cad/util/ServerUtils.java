@@ -23,7 +23,6 @@ import com.bplead.cad.bean.io.CadStatus;
 import com.bplead.cad.bean.io.Container;
 import com.bplead.cad.bean.io.Document;
 import com.bplead.cad.bean.io.Documents;
-import com.bplead.cad.bean.io.PartCategory;
 import com.ptc.windchill.uwgm.common.util.PrintHelper;
 
 import priv.lee.cad.bean.HandleResult;
@@ -85,37 +84,28 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		Document document = new Document ();
 		document.setObject (cadDocument);
 		
-		String number = "";
-		PartCategory category = CADHelper.getPartCategory (cadDocument);
-		//如果是自制件,EPMDocument编号以图纸代码即number字段为编号
-		if (category == PartCategory.MAKE) {
-		    number = cadDocument.getNumber ();
-		} //如果是外购件,EPMDocument编号以外购件图号即buyNum字段为编号
-		else if (category == PartCategory.BUY) {
-		    number = cadDocument.getBuyNum ();
-		}
-		number = CADHelper.addSuffix (number,null,true);
+		String epmnumber= CADHelper.buildEPMDocumentNumber (document);
 		// 处理多页图编号问题
 		Integer pageSize = StringUtils.isEmpty (cadDocument.getPageSize ()) ? 1 : Integer.valueOf (cadDocument.getPageSize ());
 		Integer pageIndex = StringUtils.isEmpty (cadDocument.getPageIndex ()) ? 1 : Integer.valueOf (cadDocument.getPageIndex ());
 		// 如果总页数大于1说明是多页图
 		if (pageSize > 1) {
 		    // 如果当前页大于1,则以实体文件名即XXX.DWG作为EPMDocument编号
-		    if (pageIndex > 1) {
-			number = CADHelper.getCadName (cadDocument);
-			number = number == null ? "" : number.toUpperCase ();
+		    if (pageIndex > 0) {
+			epmnumber = CADHelper.getCadName (cadDocument);
+			epmnumber = epmnumber == null ? "" : epmnumber.toUpperCase ();
 			if (logger.isDebugEnabled ()) {
-			    logger.debug ("多页图第" + pageIndex + "页处理后的编号 number is -> " + number);
+			    logger.debug ("多页图第" + pageIndex + "页处理后的编号 epmnumber is -> " + epmnumber);
 			}
 		    }
 		}
 		if (logger.isDebugEnabled ()) {
-		    logger.debug ("initialize 搜索EPMDocument的编号为 is -> " + number);
+		    logger.debug ("initialize 搜索EPMDocument的编号为 is -> " + epmnumber);
 		}
-		EPMDocument epm = CADHelper.getDocumentByNumber (number);
+		EPMDocument epm = CADHelper.getDocumentByNumber (epmnumber);
 		if (epm == null) {
 		    if (logger.isDebugEnabled ()) {
-			logger.debug ("图纸编号[" + number + "]的对象在系统中不存在.");
+			logger.debug ("图纸编号[" + epmnumber + "]的对象在系统中不存在.");
 		    }
 		    document.setCadStatus (CadStatus.NOT_EXIST);
 		} else {
@@ -183,24 +173,18 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		logger.debug ("current processor order is ->  " + ( i + 1 ));
 	    }
 
-	    CadStatus cadStatus = document.getCadStatus ();
-	    String epmNumber = "";
-	    if (cadStatus == CadStatus.NOT_EXIST) {
-		CadDocument cadDocument = (CadDocument) document.getObject ();
-		epmNumber = cadDocument.getNumber ();
-	    } else {
-		epmNumber = document.getNumber ();
-	    }
-	    epmNumber = CADHelper.removeSuffix (epmNumber,null,true);
+	    String partNumber = CADHelper.getAssociatePartNumber (document);
 	    if (logger.isDebugEnabled ()) {
-		logger.debug ("getAssociatePart epmNumber is -> " + epmNumber);
+		logger.debug ("getAssociatePart partNumber is -> " + partNumber);
 	    }
-	    WTPart part = CADHelper.getLatestWTPart (epmNumber,"Design",null);
+	    WTPart part = CADHelper.getLatestWTPart (partNumber,"Design",null);
 	    // 如果部件已存在,检查是否关联drw或者其他autoCAD文档
 	    if (part != null) {
 		List<EPMDocument> list = CADHelper.get2Drawing (part);
 		if (list != null && !list.isEmpty ()) {
-		    buf.append ("图纸代号为[" + epmNumber + "]的部件在系统中已关联drw文件或者其他AutoCAD图纸.");
+		    for (EPMDocument epm : list) {
+			buf.append ("关联部件编号为[" + partNumber + "]的部件在系统中已关联编号为" + epm.getNumber () + "drw文件或者其他AutoCAD图纸. \n");
+		    }
 		}
 	    }
 	}
@@ -240,7 +224,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		Integer pageSize = Integer.valueOf (cadDocument.getPageSize ());
 		// 总页码大于1说明是多页图
 		if (pageSize > 1) {
-		    String tempNumber = cadDocument.getNumber ();
+		    String tempNumber = CADHelper.getAssociatePartNumber (cadDocument);
 		    List<Document> tempList = mutiMap.get (tempNumber);
 		    if (tempList == null) {
 			tempList = new ArrayList<Document> ();
