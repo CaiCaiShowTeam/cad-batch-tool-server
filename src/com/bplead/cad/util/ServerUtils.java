@@ -85,20 +85,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		document.setObject (cadDocument);
 		
 		String epmnumber= CADHelper.buildEPMDocumentNumber (document);
-		// 处理多页图编号问题
-		Integer pageSize = StringUtils.isEmpty (cadDocument.getPageSize ()) ? 1 : Integer.valueOf (cadDocument.getPageSize ());
-		Integer pageIndex = StringUtils.isEmpty (cadDocument.getPageIndex ()) ? 1 : Integer.valueOf (cadDocument.getPageIndex ());
-		// 如果总页数大于1说明是多页图
-		if (pageSize > 1) {
-		    // 如果当前页大于1,则以实体文件名即XXX.DWG作为EPMDocument编号
-		    if (pageIndex > 0) {
-			epmnumber = CADHelper.getCadName (cadDocument);
-			epmnumber = epmnumber == null ? "" : epmnumber.toUpperCase ();
-			if (logger.isDebugEnabled ()) {
-			    logger.debug ("多页图第" + pageIndex + "页处理后的编号 epmnumber is -> " + epmnumber);
-			}
-		    }
-		}
+		
 		if (logger.isDebugEnabled ()) {
 		    logger.debug ("initialize 搜索EPMDocument的编号为 is -> " + epmnumber);
 		}
