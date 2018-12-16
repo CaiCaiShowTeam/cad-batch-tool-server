@@ -167,7 +167,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 	    WTPart part = CADHelper.getLatestWTPart (partNumber,"Design",null);
 	    // 如果部件已存在,检查是否关联drw或者其他autoCAD文档
 	    if (part != null) {
-		List<EPMDocument> list = CADHelper.get2Drawing (part);
+		List<EPMDocument> list = CADHelper.get2Drawing (part,document);
 		if (list != null && !list.isEmpty ()) {
 		    for (EPMDocument epm : list) {
 			buf.append ("关联部件编号为[" + partNumber + "]的部件在系统中已关联编号为" + epm.getNumber () + "drw文件或者其他AutoCAD图纸. \n");

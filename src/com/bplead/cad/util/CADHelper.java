@@ -1705,15 +1705,19 @@ public class CADHelper implements RemoteAccess {
 	return null;
     }
 
-    public static List<EPMDocument> get2Drawing(WTPart part) throws WTException {
+    public static List<EPMDocument> get2Drawing(WTPart part,Document document) throws WTException {
 	List<EPMDocument> list = new ArrayList<EPMDocument> ();
+	String epmNumber = buildEPMDocumentNumber (document);
+	if (logger.isDebugEnabled ()) {
+	    logger.debug ("get2Drawing 得到当前EPM文档编号为 epmNumber is -> " + epmNumber);
+	}
 	QueryResult qr = PartDocServiceCommand.getAssociatedCADDocuments (part);
 	while (qr.hasMoreElements ()) {
 	    EPMDocument epm = (EPMDocument) qr.nextElement ();
 	    String cadName = epm.getCADName ();
 	    if (cadName.toLowerCase ().endsWith (".drw") || cadName.toLowerCase ().endsWith (".dwg")) {
 		// 此处还要排除与部件同编号的对象
-		if (StringUtils.equalsIgnoreCase (epm.getNumber (),part.getNumber ())) {
+		if (StringUtils.equalsIgnoreCase (epm.getNumber (), epmNumber)) {
 		    continue;
 		}
 		if (!list.contains (epm)) {
