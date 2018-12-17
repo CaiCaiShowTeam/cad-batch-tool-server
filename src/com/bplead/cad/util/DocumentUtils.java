@@ -173,12 +173,17 @@ public class DocumentUtils implements RemoteAccess {
 		private static final String PROPERTIES = ".properties";
 		private static final String TIME = "time";
 		private static final String USER = "user";
+		private static final String DWG = ".DWG";
 		private EPMDocument epmdocument;
 		private File repository;
 
 		public CheckoutAndDownloadTask(EPMDocument epmdocument, File repository) {
 			this.epmdocument = epmdocument;
-			this.repository = new File(repository, epmdocument.getNumber());
+			String number = epmdocument.getNumber();
+			if(number.indexOf(DWG)>0) {
+				number = number.substring(0, number.indexOf(DWG));
+			}
+			this.repository = new File(repository, number);
 		}
 
 		private void addProperties() {
