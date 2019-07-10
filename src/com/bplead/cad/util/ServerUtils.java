@@ -283,7 +283,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		    String childNumber = link.getNumber ();
 		    WTPart childPart = CADHelper.getLatestWTPart (childNumber,"Design",null);
 		    if (childPart == null) {
-			buf.append ("编号为[" + childNumber + "]的部件在系统中不存在,不能添加为BOM部件.\n");
+			//buf.append ("编号为[" + childNumber + "]的部件在系统中不存在,不能添加为BOM部件.\n");
 			continue;
 		    }
 

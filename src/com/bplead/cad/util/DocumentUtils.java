@@ -208,7 +208,7 @@ public class DocumentUtils implements RemoteAccess {
 		@Override
 		public Boolean call() throws Exception {
 			try {
-				epmdocument = CommonUtils.checkout(epmdocument, null, EPMDocument.class);
+				//epmdocument = CommonUtils.checkout(epmdocument, null, EPMDocument.class);
 
 				// SessionMgr.setAuthenticatedPrincipal(user.getAuthenticationName());
 				download(ContentRoleType.PRIMARY);
