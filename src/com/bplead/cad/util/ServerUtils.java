@@ -29,7 +29,7 @@ import priv.lee.cad.bean.HandleResult;
 import priv.lee.cad.util.Assert;
 import priv.lee.cad.util.StringUtils;
 import wt.epm.EPMDocument;
-import wt.fc.PersistenceServerHelper;
+import wt.fc.PersistenceHelper;
 import wt.fc.QueryResult;
 import wt.fc.WTObject;
 import wt.folder.Folder;
@@ -43,9 +43,8 @@ import wt.method.RemoteAccess;
 import wt.org.WTPrincipal;
 import wt.org.WTPrincipalReference;
 import wt.org.WTUser;
-import wt.part.Quantity;
 import wt.part.WTPart;
-import wt.part.WTPartMaster;
+import wt.part.WTPartHelper;
 import wt.part.WTPartUsageLink;
 import wt.pdmlink.PDMLinkProduct;
 import wt.pom.Transaction;
@@ -278,7 +277,26 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		    logger.debug ("parentPart is -> " + parentPart.getDisplayIdentifier () + " isCheckout is -> "
 			    + WorkInProgressHelper.isCheckedOut (parentPart));
 		}
+		//检出父部件
 		WTPart copyPart = parentPart;
+		if (!WorkInProgressHelper.isCheckedOut (copyPart)) {
+		    copyPart = (WTPart) CADHelper.checkout (copyPart,"cad tool build bom.");
+		} else if (!WorkInProgressHelper.isWorkingCopy (copyPart)) {
+		    copyPart = (WTPart) WorkInProgressHelper.service.workingCopyOf (copyPart);
+		}
+		
+		//删除老版本的usageLink
+		QueryResult qr = WTPartHelper.service.getUsesWTPartMasters (copyPart);
+		while (qr.hasMoreElements ()) {
+		    WTPartUsageLink usageLink = (WTPartUsageLink)qr.nextElement();
+		    PersistenceHelper.manager.delete (usageLink);
+		}
+		
+		if (logger.isDebugEnabled ()) {
+		    logger.debug ("copyPart is -> " + copyPart.getDisplayIdentifier () + " isCheckout is -> "
+			    + WorkInProgressHelper.isCheckedOut (copyPart));
+		}
+		
 		for (CADLink link : links) {
 		    String childNumber = link.getNumber ();
 		    WTPart childPart = CADHelper.getLatestWTPart (childNumber,"Design",null);
@@ -286,54 +304,57 @@ public class ServerUtils implements RemoteAccess, Serializable {
 			//buf.append ("编号为[" + childNumber + "]的部件在系统中不存在,不能添加为BOM部件.\n");
 			continue;
 		    }
-
-		    if (logger.isDebugEnabled ()) {
-			logger.debug ("copyPart is -> " + copyPart.getDisplayIdentifier () + " isCheckout is -> "
-				+ WorkInProgressHelper.isCheckedOut (copyPart));
-		    }
-		    if (!WorkInProgressHelper.isCheckedOut (copyPart)) {
-			copyPart = (WTPart) CADHelper.checkout (copyPart,"cad tool build bom.");
-		    } else if (!WorkInProgressHelper.isWorkingCopy (copyPart)) {
-			copyPart = (WTPart) WorkInProgressHelper.service.workingCopyOf (copyPart);
-		    }
-		    // 找到父部件与子部件的usageLink
-		    WTPartUsageLink oldLink = CADHelper.getWTPartUsageLink (copyPart,
-			    (WTPartMaster) childPart.getMaster ());
-		    // 新建
-		    if (oldLink == null) {
-			WTPartUsageLink usageLink = CADHelper.createUsageLink (copyPart,childPart,
+		    
+		    //新建BOM
+		    WTPartUsageLink usageLink = CADHelper.createUsageLink (copyPart,childPart,
 				Double.valueOf (link.getQuantity ()));
-			List<WTPartUsageLink> usageLinks = usageLinkMap.get (copyPart);
-			if (usageLinks == null) {
-			    usageLinks = new ArrayList<WTPartUsageLink> ();
-			    usageLinks.add (usageLink);
-			    usageLinkMap.put (copyPart,usageLinks);
-			} else {
-			    usageLinks.add (usageLink);
-			}
-		    } // 更新
-		    else {
-			// 更新link
-			Double newQuantity = Double.valueOf (link.getQuantity ());
-			Double oldQuantity = oldLink.getQuantity ().getAmount ();
-			if (logger.isDebugEnabled ()) {
-			    logger.debug ("newQuantity is -> " + newQuantity + " oldQuantity is -> " + oldQuantity);
-			}
-			// 如果更新前后数量不一致则更新
-			if (newQuantity != oldQuantity) {
-			    Quantity quantity = Quantity.newQuantity (newQuantity,oldLink.getQuantity ().getUnit ());
-			    oldLink.setQuantity (quantity);
-			    PersistenceServerHelper.manager.update (oldLink);
-			}
-			List<WTPartUsageLink> usageLinks = usageLinkMap.get (copyPart);
-			if (usageLinks == null) {
-			    usageLinks = new ArrayList<WTPartUsageLink> ();
-			    usageLinks.add (oldLink);
-			    usageLinkMap.put (copyPart,usageLinks);
-			} else {
-			    usageLinks.add (oldLink);
-			}
+		    List<WTPartUsageLink> usageLinks = usageLinkMap.get (copyPart);
+		    if (usageLinks == null) {
+			usageLinks = new ArrayList<WTPartUsageLink> ();
+			usageLinks.add (usageLink);
+			usageLinkMap.put (copyPart,usageLinks);
+		    } else {
+			usageLinks.add (usageLink);
 		    }
+		    
+//		    // 找到父部件与子部件的usageLink
+//		    WTPartUsageLink oldLink = CADHelper.getWTPartUsageLink (copyPart,
+//			    (WTPartMaster) childPart.getMaster ());
+//		    // 新建
+//		    if (oldLink == null) {
+//			WTPartUsageLink usageLink = CADHelper.createUsageLink (copyPart,childPart,
+//				Double.valueOf (link.getQuantity ()));
+//			List<WTPartUsageLink> usageLinks = usageLinkMap.get (copyPart);
+//			if (usageLinks == null) {
+//			    usageLinks = new ArrayList<WTPartUsageLink> ();
+//			    usageLinks.add (usageLink);
+//			    usageLinkMap.put (copyPart,usageLinks);
+//			} else {
+//			    usageLinks.add (usageLink);
+//			}
+//		    } // 更新
+//		    else {
+//			// 更新link
+//			Double newQuantity = Double.valueOf (link.getQuantity ());
+//			Double oldQuantity = oldLink.getQuantity ().getAmount ();
+//			if (logger.isDebugEnabled ()) {
+//			    logger.debug ("newQuantity is -> " + newQuantity + " oldQuantity is -> " + oldQuantity);
+//			}
+//			// 如果更新前后数量不一致则更新
+//			if (newQuantity != oldQuantity) {
+//			    Quantity quantity = Quantity.newQuantity (newQuantity,oldLink.getQuantity ().getUnit ());
+//			    oldLink.setQuantity (quantity);
+//			    PersistenceServerHelper.manager.update (oldLink);
+//			}
+//			List<WTPartUsageLink> usageLinks = usageLinkMap.get (copyPart);
+//			if (usageLinks == null) {
+//			    usageLinks = new ArrayList<WTPartUsageLink> ();
+//			    usageLinks.add (oldLink);
+//			    usageLinkMap.put (copyPart,usageLinks);
+//			} else {
+//			    usageLinks.add (oldLink);
+//			}
+//		    }
 		}
 	    }
 
