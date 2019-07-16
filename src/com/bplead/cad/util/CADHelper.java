@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Vector;
 
 import org.apache.log4j.Logger;
 
@@ -32,6 +33,7 @@ import com.bplead.cad.bean.io.PartCategory;
 import com.bplead.cad.config.ConfigAnalyticalTool;
 import com.ptc.windchill.cadx.common.WTPartUtilities;
 import com.ptc.windchill.enterprise.part.commands.PartDocServiceCommand;
+import com.ptc.windchill.uwgm.common.prefs.ViewablePreferenceHelper;
 import com.ptc.windchill.uwgm.common.util.PrintHelper;
 
 import priv.lee.cad.util.Assert;
@@ -56,6 +58,7 @@ import wt.fc.QueryResult;
 import wt.fc.WTObject;
 import wt.fc.collections.WTArrayList;
 import wt.fc.collections.WTCollection;
+import wt.fc.collections.WTHashSet;
 import wt.folder.Folder;
 import wt.folder.FolderEntry;
 import wt.folder.FolderException;
@@ -79,6 +82,7 @@ import wt.part.WTPartUsageLink;
 import wt.pds.StatementSpec;
 import wt.query.QuerySpec;
 import wt.query.SearchCondition;
+import wt.representation.RepresentationHelper;
 import wt.type.ClientTypedUtility;
 import wt.type.TypeDefinitionReference;
 import wt.type.TypedUtility;
@@ -1046,7 +1050,7 @@ public class CADHelper implements RemoteAccess {
      * 
      * @throws Exception
      */
-    public static WTObject [] saveDocAndPartForMuti(String partNumber, List<Document> documents) throws Exception {
+    public static Object [] saveDocAndPartForMuti(String partNumber, List<Document> documents) throws Exception {
 	Document document0 = documents.get (0);
 	List<EPMDocument> epmList = new ArrayList<EPMDocument> ();
 	for (Document document : documents) {
@@ -1165,16 +1169,18 @@ public class CADHelper implements RemoteAccess {
 
 	// Check in the part if we checked it out in order to create the build
 	// rule.
+	Workable[] checkinObjects = null;
 	if (list != null && !list.isEmpty ()) {
 	    Workable [] copyWorkables = new Workable [list.size ()];
 	    for (int i = 0; i < list.size (); i++) {
 		copyWorkables[i] = list.get (i);
 	    }
-	    checkin (copyWorkables,"cad tool update epmdocument.");
+	    checkinObjects = checkin (copyWorkables,"cad tool update epmdocument.");
 	}
 
-	WTObject [] objects = new WTObject [1];
+	Object [] objects = new Object [2];
 	objects[0] = getLatestWTPart (part.getNumber (),"Design",null);
+	objects[1] = checkinObjects;
 	return objects;
     }
 
@@ -1834,5 +1840,31 @@ public class CADHelper implements RemoteAccess {
 	    }
 	}
 	return epmnumber;
+    }
+    
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public static void publish (WTHashSet wtHashSet) {
+	if (wtHashSet == null || wtHashSet.isEmpty ()) {
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("需要发布表示法的集合为空,不做处理.");
+	    }
+	    return;
+	}
+	try {
+	    Vector toPublish = new Vector(wtHashSet.size ());
+	    for (Iterator iter = wtHashSet.persistableIterator ();iter.hasNext ();) {
+		EPMDocument epm = (EPMDocument) iter.next ();
+		if (ViewablePreferenceHelper.isDocumentValidForViewableGeneration (epm)) {
+		    toPublish.add (epm);
+		}
+	    }
+	    if (logger.isDebugEnabled ()) {
+		logger.debug ("检入的CAD文档个数 is -> " + wtHashSet.size ());
+		logger.debug ("需要发布表示法个数 is -> " + toPublish.size ());
+	    }
+	    RepresentationHelper.service.emitReadyToPublishEvent (toPublish,null);
+	} catch (Exception e) {
+	    logger.warn ("发布表示法异常",e);
+	}
     }
 }

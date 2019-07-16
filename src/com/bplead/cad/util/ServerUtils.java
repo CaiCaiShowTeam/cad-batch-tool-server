@@ -29,9 +29,11 @@ import priv.lee.cad.bean.HandleResult;
 import priv.lee.cad.util.Assert;
 import priv.lee.cad.util.StringUtils;
 import wt.epm.EPMDocument;
+import wt.fc.Persistable;
 import wt.fc.PersistenceHelper;
 import wt.fc.QueryResult;
 import wt.fc.WTObject;
+import wt.fc.collections.WTHashSet;
 import wt.folder.Folder;
 import wt.folder.FolderHelper;
 import wt.folder.SubFolder;
@@ -52,6 +54,7 @@ import wt.session.SessionHelper;
 import wt.util.WTException;
 import wt.util.WTPropertyVetoException;
 import wt.vc.wip.WorkInProgressHelper;
+import wt.vc.wip.Workable;
 
 public class ServerUtils implements RemoteAccess, Serializable {
 
@@ -192,6 +195,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		logger.debug ("checkin checkRows is -> " + checkRows);
 	    }
 	    Assert.notNull (checkRows,"no choose rows...");
+	    WTHashSet wtHashSet = new WTHashSet ();
 
 	    List<Document> docList = documents.getDocuments ();
 	    // 暂时存储多页图的图纸待处理
@@ -231,6 +235,10 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		    logger.debug (
 			    objects.length > 2 ? PrintHelper.printPersistable (objects[2]) : "buildrule is null.");
 		}
+		//收集检入后的EPMDocument
+		if (objects.length > 0) {
+		    wtHashSet.add (objects[0]);
+		}
 	    }
 
 	    // 处理多页图纸的检入
@@ -241,9 +249,20 @@ public class ServerUtils implements RemoteAccess, Serializable {
 	    for (Map.Entry<String, List<Document>> entry : mutiMap.entrySet ()) {
 		String number = entry.getKey ();
 		List<Document> list = entry.getValue ();
-		WTObject [] objects = CADHelper.saveDocAndPartForMuti (number,list);
+		Object [] objects = CADHelper.saveDocAndPartForMuti (number,list);
 		if (logger.isDebugEnabled ()) {
-		    logger.debug (objects.length > 0 ? PrintHelper.printPersistable (objects[0]) : "wtpart is null.");
+		    logger.debug (objects.length > 0 ? PrintHelper.printPersistable ((Persistable) objects[0]) : "wtpart is null.");
+		}
+		//收集检入后的EPMDocument
+		if (objects.length > 1) {
+		    Workable[] checkinObjects = objects[1] == null ? null : (Workable []) objects[1];
+		    if (checkinObjects != null) {
+			for (Workable workable : checkinObjects) {
+			    if (workable instanceof EPMDocument) {
+				wtHashSet.add (workable);
+			    }
+			}
+		    }
 		}
 	    }
 
@@ -375,6 +394,9 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		    CADHelper.checkin (part,"CAD工具构建BOM检入.");
 		}
 	    }
+	    
+	    // 此处嵌入发布表示法代码 TODO
+	    CADHelper.publish (wtHashSet);
 
 	    result = HandleResult.toSuccessedResult (true);
 
