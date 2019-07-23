@@ -326,6 +326,12 @@ public class ServerUtils implements RemoteAccess, Serializable {
 			buf.append ("编号为[" + childNumber + "]的部件在系统中不存在,不能添加为BOM部件.\n");
 			continue;
 		    }
+		    //检查BOM数量是否为空
+		    String quantity = link.getQuantity ();
+		    if (StringUtils.isEmpty (quantity)) {
+			buf.append ("编号为[" + childNumber + "]的子部件数量为空,请检查.\n");
+			continue;
+		    }
 		    
 		    //新建BOM
 		    WTPartUsageLink usageLink = CADHelper.createUsageLink (copyPart,childPart,
