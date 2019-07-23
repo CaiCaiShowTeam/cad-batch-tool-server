@@ -335,7 +335,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		    
 		    //新建BOM
 		    WTPartUsageLink usageLink = CADHelper.createUsageLink (copyPart,childPart,
-				Double.valueOf (link.getQuantity ()));
+				Double.valueOf (quantity));
 		    List<WTPartUsageLink> usageLinks = usageLinkMap.get (copyPart);
 		    if (usageLinks == null) {
 			usageLinks = new ArrayList<WTPartUsageLink> ();
