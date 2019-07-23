@@ -328,7 +328,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		    }
 		    //检查BOM数量是否为空
 		    String quantity = link.getQuantity ();
-		    if (StringUtils.isEmpty (quantity)) {
+		    if (StringUtils.isEmpty (quantity == null ? null : quantity.trim ())) {
 			buf.append ("编号为[" + childNumber + "]的子部件数量为空,请检查.\n");
 			continue;
 		    }
