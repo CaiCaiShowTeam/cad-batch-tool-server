@@ -38,8 +38,10 @@ import wt.folder.Folder;
 import wt.folder.FolderHelper;
 import wt.folder.SubFolder;
 import wt.inf.container.ContainerSpec;
+import wt.inf.container.WTContainer;
 import wt.inf.container.WTContainerHelper;
 import wt.inf.container.WTContainerRef;
+import wt.inf.library.WTLibrary;
 import wt.log4j.LogR;
 import wt.method.RemoteAccess;
 import wt.org.WTPrincipal;
@@ -578,7 +580,12 @@ public class ServerUtils implements RemoteAccess, Serializable {
 
 	HandleResult<SimpleFolder> result = null;
 	try {
-	    PDMLinkProduct pdmLinkProduct = CommonUtils.getPersistable (product.getOid (),PDMLinkProduct.class);
+		WTContainer pdmLinkProduct = CommonUtils.getPersistable (product.getOid (),WTContainer.class);
+		if(pdmLinkProduct instanceof PDMLinkProduct) {
+			pdmLinkProduct = (PDMLinkProduct)pdmLinkProduct;
+		}else {
+			pdmLinkProduct = (WTLibrary)pdmLinkProduct;
+		}
 	    WTContainerRef ref = WTContainerRef.newWTContainerRef (pdmLinkProduct);
 
 	    Folder folder = FolderHelper.service.getFolder (DEFAULT_FOLDER,ref);
@@ -681,6 +688,7 @@ public class ServerUtils implements RemoteAccess, Serializable {
 	try {
 	    List<SimplePdmLinkProduct> infos = new ArrayList<SimplePdmLinkProduct> ();
 	    WTPrincipal localWTPrincipal = SessionHelper.manager.getPrincipal ();
+	    //搜索产品容器
 	    ContainerSpec cs = new ContainerSpec (PDMLinkProduct.class);
 	    cs.setUser (WTPrincipalReference.newWTPrincipalReference (localWTPrincipal));
 	    cs.setMembershipState (256);
@@ -700,6 +708,30 @@ public class ServerUtils implements RemoteAccess, Serializable {
 		SimplePdmLinkProduct info = new SimplePdmLinkProduct ();
 		info.setOid (CommonUtils.getPersistableOid (pdm));
 		info.setName (pdm.getName ());
+		info.setModifyTime (updateDate);
+		info.setModifier (modifier);
+		infos.add (info);
+	    }
+	    //搜索存储库
+	    ContainerSpec cs2 = new ContainerSpec (WTLibrary.class);
+	    cs2.setUser (WTPrincipalReference.newWTPrincipalReference (localWTPrincipal));
+	    cs2.setMembershipState (256);
+	    QueryResult qr2 = WTContainerHelper.service.getContainers (cs2);
+	    while (qr2.hasMoreElements ()) {
+	    WTLibrary library = (WTLibrary) qr2.nextElement ();
+		WTPrincipal principal = library.getOwner ();
+		WTUser user = null;
+		if (principal instanceof WTUser) {
+		    user = (WTUser) principal;
+		} else {
+		    continue;
+		}
+		String modifier = user.getFullName () + "(" + user.getName () + ")";
+		String updateDate = CommonUtils.transferTimestampToString (library.getModifyTimestamp (),null,null,null);
+
+		SimplePdmLinkProduct info = new SimplePdmLinkProduct ();
+		info.setOid (CommonUtils.getPersistableOid (library));
+		info.setName (library.getName ());
 		info.setModifyTime (updateDate);
 		info.setModifier (modifier);
 		infos.add (info);
